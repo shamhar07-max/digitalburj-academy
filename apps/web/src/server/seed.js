@@ -59,6 +59,22 @@ for (const [code, name] of skills) {
     student, code, code === "web" ? 62 : code === "backend" ? 41 : 18);
 }
 
+const catalog = [
+["DB-00","Digital Foundations","Start here"],["DB-01","Real-World Problem Solving & Product Thinking","Start here"],
+["DB-02","Professional Web Development","Builder"],["DB-03","Backend, APIs & Databases","Builder"],
+["DB-04","AI-Native Software Development","Builder"],["DB-05","Data, PostgreSQL & Business Data","Builder"],
+["DB-06","Production Engineering","Professional"],["DB-07","Secure Software & Cybersecurity","Professional"],
+["DB-08","Software Testing & Quality Engineering","Professional"],["DB-09","Payments, Ledgers, Webhooks & Money","Advanced"],
+["DB-10","Real-Time Applications","Professional"],["DB-11","Documents, Uploads & Storage","Professional"],
+["DB-12","AI Agents, Automation & Business Workflows","Flagship"],["DB-13","CRM / ERP / HRM","Consultant"],
+["DB-14","Mobile App Builder","Builder"],["DB-15","Search & AI Visibility Engineering","Consultant"],
+["DB-16","Social Media & Content Operations","Consultant"],["DB-17","From Idea to MVP","Founder"],
+["DB-18","Build, Launch & Grow","Founder"],["DB-19","Digital Transformation Consulting","Consultant"],
+["DB-20","Client Delivery & Freelancing","Professional"],["DB-21","Business Operations & Practice","Professional"],
+["DB-22","Professional Challenge","Master"]];
+for (const [code, name, level] of catalog) {
+  run("INSERT OR IGNORE INTO courses (code, name, level, outcome) VALUES (?,?,?,?)", code, name, level, name);
+}
 for (const code of ["DB-00", "DB-01", "DB-03"]) {
   run("INSERT OR IGNORE INTO enrollments (user_id, course_code) VALUES (?,?)", student, code);
 }
