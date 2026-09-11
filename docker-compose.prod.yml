@@ -1,0 +1,18 @@
+# digitalburj production compose (single VPS)
+services:
+  website:
+    image: digitalburj-website:prod
+    build: ../digitalburj-website
+    restart: unless-stopped
+    ports: ["3000:3000"]
+  academy:
+    image: digitalburj-academy:prod
+    build:
+      context: ../digitalburj-academy/apps/web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports: ["3100:3100"]
+    volumes: ["academy-data:/data"]
+
+volumes:
+  academy-data:
