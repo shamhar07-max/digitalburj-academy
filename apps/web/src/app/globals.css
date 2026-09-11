@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+:root {
+  --db-lab: #faf6ee;
+  --db-panel: #ffffff;
+  --db-ink: #17251f;
+  --db-ink-soft: #44554c;
+  --db-ink-faint: #7a887f;
+  --db-hair: #e3dccb;
+  --db-navy: #12332a;
+  --db-cobalt: #0b6b4f;
+  --db-cyan: #d9481c;
+  --db-gold: #e8721c;
+}
+
+@theme inline {
+  --color-lab: var(--db-lab);
+  --color-panel: var(--db-panel);
+  --color-ink: var(--db-ink);
+  --color-ink-soft: var(--db-ink-soft);
+  --color-ink-faint: var(--db-ink-faint);
+  --color-hair: var(--db-hair);
+  --color-navy: var(--db-navy);
+  --color-cobalt: var(--db-cobalt);
+  --color-cyanx: var(--db-cyan);
+  --color-gold: var(--db-gold);
+  --font-display: var(--font-sora);
+  --font-mono2: var(--font-plexmono);
+  --font-sans: var(--font-plexsans);
+}
+
+* { border-color: var(--db-hair); }
+html { scroll-behavior: smooth; }
+body { background: var(--db-lab); color: var(--db-ink); -webkit-font-smoothing: antialiased; }
+::selection { background: var(--db-cobalt); color: #fff; }
+
+@layer utilities {
+  .container-db { width: 100%; max-width: 72rem; margin-inline: auto; padding-inline: 1.25rem; }
+  @media (min-width: 640px) { .container-db { padding-inline: 2rem; } }
+  .font-display { font-family: var(--font-display), sans-serif; }
+  .font-mono-d { font-family: var(--font-mono2), monospace; }
+  .card { background: var(--db-panel); border: 1.5px solid var(--db-hair); border-radius: 16px; box-shadow: 0 10px 28px -18px rgba(23,37,31,.3); }
+}

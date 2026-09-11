@@ -1,0 +1,12 @@
+export type Role = "student" | "teacher" | "admin";
+export type SessionUser = { id: number; email: string; name: string; role: Role; status: string };
+export function hashPassword(password: string): string;
+export function verifyPassword(password: string, stored: string): boolean;
+export function createUser(email: string, name: string, password: string, role?: Role): SessionUser;
+export function authenticate(email: string, password: string): SessionUser;
+export function createSession(userId: number): { token: string; expiresAt: string };
+export function getSessionUser(token: string | undefined | null): SessionUser | null;
+export function destroySession(token: string): void;
+export const COOKIE: string;
+export function cookieHeader(token: string, expiresAt: string): string;
+export function clearCookieHeader(): string;
