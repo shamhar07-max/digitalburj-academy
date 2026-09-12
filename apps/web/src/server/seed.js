@@ -78,5 +78,7 @@ for (const [code, name, level] of catalog) {
 for (const code of ["DB-00", "DB-01", "DB-03"]) {
   run("INSERT OR IGNORE INTO enrollments (user_id, course_code) VALUES (?,?)", student, code);
 }
+run("INSERT OR IGNORE INTO companies (id, user_id, name, trade, stage) VALUES (1,?,?,?,?)",
+  student, "NOVA", "logistics", "website");
 
 console.log("seed ok");

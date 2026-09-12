@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/server/auth.js";
 import { all, row } from "@/server/db.js";
+import { CompanyWidget, LanguageWidget } from "@/components/Studio";
 import Link from "next/link";
 
 export default async function Dashboard() {
@@ -24,6 +25,8 @@ export default async function Dashboard() {
      LEFT JOIN student_skills ss ON ss.skill_code=sk.code AND ss.user_id=?`, user.id);
   const notes = all<{ id: number; text: string; created_at: string }>(
     "SELECT id, text, created_at FROM notifications WHERE user_id=? ORDER BY id DESC LIMIT 5", user.id);
+  const companies = all<{ id: number; name: string; trade: string; stage: string }>(
+    "SELECT id, name, trade, stage FROM companies WHERE user_id=? ORDER BY id", user.id);
 
   return (
     <div className="container-db py-10">
@@ -55,6 +58,8 @@ export default async function Dashboard() {
         </div>
 
         <div className="space-y-5">
+          <CompanyWidget initial={companies} />
+          <LanguageWidget current={user.language || "en"} />
           <div className="card p-6">
             <h2 className="font-display text-lg font-extrabold">Your skills</h2>
             <div className="mt-4 space-y-3">

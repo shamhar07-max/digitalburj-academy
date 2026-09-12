@@ -3,7 +3,7 @@
 - Courses: 23 (1 with full lesson content)
 - Modules: 73
 - Full lessons: 12
-- Generated: 2026-09-11
+- Generated: 2026-09-12
 
 ## DB-00 — Digital Foundations
 Complete beginners; no code needed · Starter · 4w · prereq: none · v1.0.0

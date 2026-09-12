@@ -26,6 +26,7 @@ async function TopBar() {
         <nav className="hidden items-center gap-5 text-sm font-semibold text-ink-soft md:flex">
           <Link href="/courses" className="hover:text-ink">Courses</Link>
           <Link href="/missions" className="hover:text-ink">Missions</Link>
+          <Link href="/passport" className="hover:text-ink">Passport</Link>
           <Link href="/dashboard" className="hover:text-ink">Dashboard</Link>
           <Link href="/evidence" className="hover:text-ink">Evidence</Link>
           {user && (user.role === "teacher" || user.role === "admin") && (

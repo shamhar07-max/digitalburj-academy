@@ -23,13 +23,13 @@ export function createUser(email, name, password, role = "student") {
   }
   const r = run("INSERT INTO users (email, name, password_hash, role) VALUES (?,?,?,?)",
     email.toLowerCase(), name, hashPassword(password), role);
-  const u = row("SELECT id, email, name, role, status FROM users WHERE id=?", r.lastInsertRowid);
+  const u = row("SELECT id, email, name, role, status, language FROM users WHERE id=?", r.lastInsertRowid);
   if (!u) throw new Error("User creation failed");
   return u;
 }
 
 export function authenticate(email, password) {
-  const u = row("SELECT id, email, name, role, status, password_hash FROM users WHERE email=?", email.toLowerCase());
+  const u = row("SELECT id, email, name, role, status, language, password_hash FROM users WHERE email=?", email.toLowerCase());
   if (!u || !verifyPassword(password, u.password_hash)) {
     throw Object.assign(new Error("Invalid email or password"), { status: 401 });
   }
@@ -53,7 +53,7 @@ export function getSessionUser(token) {
     run("DELETE FROM sessions WHERE token=?", token);
     return null;
   }
-  return row("SELECT id, email, name, role, status FROM users WHERE id=? AND status='ACTIVE'", s.user_id) ?? null;
+  return row("SELECT id, email, name, role, status, language FROM users WHERE id=? AND status='ACTIVE'", s.user_id) ?? null;
 }
 
 export function destroySession(token) {

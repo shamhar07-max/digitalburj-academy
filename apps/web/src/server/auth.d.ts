@@ -1,5 +1,5 @@
 export type Role = "student" | "teacher" | "admin";
-export type SessionUser = { id: number; email: string; name: string; role: Role; status: string };
+export type SessionUser = { id: number; email: string; name: string; role: Role; status: string; language: string };
 export function hashPassword(password: string): string;
 export function verifyPassword(password: string, stored: string): boolean;
 export function createUser(email: string, name: string, password: string, role?: Role): SessionUser;

@@ -4,6 +4,7 @@ import { writeFileSync } from "node:fs";
 import { CATALOG } from "../apps/web/src/content/academy/catalog.js";
 import { DB00 } from "../apps/web/src/content/academy/db-00.js";
 import { SKILL_IDS } from "../apps/web/src/content/academy/skills.js";
+import { SKILL_EDGES } from "../apps/web/src/content/academy/graph.js";
 import type { Course } from "../apps/web/src/content/academy/types.js";
 
 const errors: string[] = [];
@@ -71,6 +72,16 @@ const lids = courses.flatMap((c) => c.modules.flatMap((m) => (m.lessons ?? []).m
 for (const id of new Set(lids)) {
   if (lids.filter((x) => x === id).length > 1) err(`duplicate lesson id ${id}`);
 }
+// 6. skill graph integrity
+const skillSet2 = new Set(SKILL_IDS);
+for (const [a, b] of SKILL_EDGES) {
+  if (!skillSet2.has(a)) err(`graph: unknown skill ${a}`);
+  if (!skillSet2.has(b)) err(`graph: unknown skill ${b}`);
+  if (a === b) err(`graph: self-loop ${a}`);
+}
+const gids = new Set(SKILL_EDGES.flat());
+const untaught = [...skillSet2].filter((s) => !gids.has(s) && !courses.some((c) => c.skills.includes(s)));
+if (untaught.length) warn(`skills outside graph+courses: ${untaught.join(",")}`);
 
 // write generated catalog
 const totalLessons = lids.length;

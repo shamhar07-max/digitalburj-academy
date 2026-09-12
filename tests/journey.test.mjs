@@ -51,6 +51,7 @@ function client(base) {
   }
   return {
     post: (p, b, h) => call("POST", p, b, h),
+    patch: (p, b, h) => call("PATCH", p, b, h),
     get: (p) => call("GET", p),
     register: (email, name, pw = "password123") => call("POST", "/api/auth/register", { email, name, password: pw }),
   };
@@ -150,6 +151,28 @@ describe("academy vertical slice", () => {
     // wrong password → 401, unknown user data stays hidden
     r = await anon.post("/api/auth/login", { email: ea, password: "wrongpassword" });
     assert.equal(r.status, 401);
+  });
+
+  it("studio layer: company, language, passport", async () => {
+    const s = client(base);
+    await s.register(`w${Date.now()}@t.dev`, "W");
+    // company create + duplicate guard
+    let r = await s.post("/api/companies", { name: "NOVA", trade: "logistics" });
+    assert.equal(r.status, 201);
+    r = await s.post("/api/companies", { name: "NOVA", trade: "logistics" });
+    assert.equal(r.json.duplicate, true);
+    r = await s.post("/api/companies", { name: "X", trade: "logistics" });
+    assert.equal(r.status, 422, "name too short rejected");
+    // language allowlist
+    r = await s.patch("/api/profile", { language: "hinglish" });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.language, "hinglish");
+    r = await s.patch("/api/profile", { language: "klingon" });
+    assert.equal(r.status, 422);
+    // passport renders (empty state, no crash)
+    r = await s.get("/api/evidence");
+    assert.equal(r.status, 200);
+    assert.ok(Array.isArray(r.json.evidence));
   });
 
   it("answer keys never leak to students", async () => {

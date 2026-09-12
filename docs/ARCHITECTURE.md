@@ -17,8 +17,19 @@ Grading queue: `job_queue/job_runs` + worker pool + timeouts + dead-letter; noti
 2. Learning engine ✅ (Decision/Break labs, missions, rubrics-lite, feedback)
 3. Builder (GitHub-linked projects, sandbox tests, automated grading)
 4. Capability (portfolio, certificates verify URL, talent export)
-5. Advanced (Incident Room, AI Judgment Lab, client sim, copilot with graded-work refusal)
+5. Advanced (Incident Room, AI Judgment Lab, client simulation, copilot with graded-work refusal)
 6. Network (DB-22 challenge, Talent/Jobs integration)
+
+## Ecosystem posture (target, not yet built)
+- **Digital Burj ID**: one account across Academy/Studio/Business/Talent/Jobs.
+  Current sessions table gains `scope` + cross-app trust later; no second identity.
+- **Skill graph** (`content/academy/graph.ts`): prerequisite edges between canonical
+  skills; validator enforces no orphans. Jobs search will traverse evidence→skill→graph.
+- **Persistent company** (`companies`): one evolving student business (NOVA pattern).
+- **Failure passport** (`/passport`): recovered failures as first-class evidence.
+- **Language preference**: explanations localized, terminology always English.
+- **Talent/Jobs handoff**: capability record + evidence export shape is the contract
+  Talent will consume. No separate talent DB until then — single source of truth.
 
 ## 10/10 gates for each phase
 Authz tests (IDOR, escalation) · idempotency tests · concurrency (409, not silent overwrite) · audit coverage · tested restore · E2E journey test (this repo: `tests/journey.test.mjs`) · WCAG 2.2 AA UI pass · mobile pass.
