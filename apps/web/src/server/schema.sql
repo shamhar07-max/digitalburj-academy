@@ -122,6 +122,19 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id);
 
+-- Automated grading runs: one per submission. INFRASTRUCTURE_ERROR is never
+-- reported as student failure; status distinguishes the two explicitly.
+CREATE TABLE IF NOT EXISTS grading_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  submission_id INTEGER NOT NULL UNIQUE REFERENCES submissions(id),
+  status TEXT NOT NULL DEFAULT 'QUEUED' CHECK (status IN ('QUEUED','RUNNING','PASSED','FAILED','INFRASTRUCTURE_ERROR','TIMED_OUT')),
+  score INTEGER,
+  checks TEXT NOT NULL DEFAULT '[]',
+  error TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Persistent student company (NOVA concept): one evolving business per student.
 CREATE TABLE IF NOT EXISTS companies (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

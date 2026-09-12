@@ -130,6 +130,22 @@ describe("academy vertical slice", () => {
     r = await stu.get("/api/evidence");
     assert.ok(r.json.evidence.some((e) => e.id === r.json.evidence_id || e.submission_id === subId) || r.json.evidence.length >= 1);
     assert.ok(r.json.skills.some((s) => s.level > 0), "skill bumped");
+    // automated grading ran async — poll briefly
+    let run = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise((res) => setTimeout(res, 250));
+      const g = await stu.get(`/api/grading/${subId}`);
+      if (g.json.grading && g.json.grading.status !== "QUEUED") { run = g.json.grading; break; }
+    }
+    assert.ok(run, "grading run completed");
+    assert.ok(["PASSED", "FAILED"].includes(run.status), `unexpected ${run.status}`);
+    assert.ok(Array.isArray(JSON.parse(run.checks)) && JSON.parse(run.checks).length === 4);
+    // talent export contract
+    r = await stu.get("/api/talent/export");
+    assert.equal(r.status, 200);
+    assert.equal(r.json.version, "talent-export-v1");
+    assert.ok(r.json.skills.length >= 1 && r.json.evidence.length >= 1);
+    assert.ok(r.json.verify.includes("talent.digitalburj.com/DB-"));
   });
 
   it("authz: student cannot touch teacher queue or other students", async () => {
@@ -147,6 +163,12 @@ describe("academy vertical slice", () => {
     // unauthenticated submit → 401
     const anon = client(base);
     r = await anon.post("/api/missions/1/submit", { body: "hello world this is long enough" }, { "Idempotency-Key": "anon-1" });
+    assert.equal(r.status, 401);
+    // grading run of another student is invisible
+    r = await b.get("/api/grading/1");
+    assert.ok([403, 404].includes(r.status), `got ${r.status}`);
+    // talent export requires login
+    r = await anon.get("/api/talent/export");
     assert.equal(r.status, 401);
     // wrong password → 401, unknown user data stays hidden
     r = await anon.post("/api/auth/login", { email: ea, password: "wrongpassword" });

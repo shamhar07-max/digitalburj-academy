@@ -17,9 +17,11 @@ export default async function Submissions() {
   const jar = await cookies();
   const user = getSessionUser(jar.get("db_academy")?.value);
   if (!user) redirect("/login");
-  const subs = all<{ id: number; mission_id: number; mission_title: string; status: string; score: number | null; updated_at: string }>(
-    `SELECT s.id, s.mission_id, s.status, s.score, s.updated_at, m.title AS mission_title FROM submissions s
-     JOIN missions m ON m.id=s.mission_id WHERE s.user_id=? ORDER BY s.id DESC`, user.id);
+  const subs = all<{ id: number; mission_id: number; mission_title: string; status: string; score: number | null; updated_at: string; gstatus: string | null; gscore: number | null }>(
+    `SELECT s.id, s.mission_id, s.status, s.score, s.updated_at, m.title AS mission_title,
+            g.status AS gstatus, g.score AS gscore FROM submissions s
+     JOIN missions m ON m.id=s.mission_id LEFT JOIN grading_runs g ON g.submission_id=s.id
+     WHERE s.user_id=? ORDER BY s.id DESC`, user.id);
   const reviews = all<{ submission_id: number; decision: string; feedback: string; created_at: string }>(
     `SELECT r.submission_id, r.decision, r.feedback, r.created_at FROM reviews r
      JOIN submissions s ON s.id=r.submission_id WHERE s.user_id=? ORDER BY r.id DESC`, user.id);
@@ -35,7 +37,12 @@ export default async function Submissions() {
           <div key={s.id} className="card p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Link href={`/missions/${s.mission_id}`} className="font-bold hover:text-cobalt">#{s.id} · {s.mission_title}</Link>
-              <span className={`rounded-full px-2.5 py-1 font-mono-d text-[10px] font-bold ${STATUS_STYLE[s.status] ?? ""}`}>{s.status.replace(/_/g, " ")}</span>
+              <span className="flex items-center gap-2">
+                {s.gstatus && s.gstatus !== "QUEUED" && (
+                  <span className="font-mono-d rounded-full bg-panel-deep px-2.5 py-1 text-[10px] font-bold text-ink-faint">AUTO {s.gstatus}{typeof s.gscore === "number" ? ` ${s.gscore}%` : ""}</span>
+                )}
+                <span className={`rounded-full px-2.5 py-1 font-mono-d text-[10px] font-bold ${STATUS_STYLE[s.status] ?? ""}`}>{s.status.replace(/_/g, " ")}</span>
+              </span>
             </div>
             {fb.get(s.id) && (
               <p className="mt-2 rounded-lg bg-lab px-3 py-2 text-sm text-ink-soft">

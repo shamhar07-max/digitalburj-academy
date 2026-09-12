@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getSessionUser } from "@/server/auth.js";
 import { row, run } from "@/server/db.js";
 import { deny, audit, notify, requestId } from "@/server/guard.js";
+import { enqueueGrading } from "@/server/grader.js";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -28,7 +29,8 @@ export async function POST(req: Request, { params }: Ctx) {
   );
   const sub = row("SELECT * FROM submissions WHERE id=?", r.lastInsertRowid);
   audit(user.id, "submit", "submission", r.lastInsertRowid, "", "SUBMITTED", rid);
-  notify(user.id, "submission", `Submission #${r.lastInsertRowid} received — queued for review.`);
+  notify(user.id, "submission", `Submission #${r.lastInsertRowid} received — automated checks running, then teacher review.`);
+  enqueueGrading(Number(r.lastInsertRowid));
   return NextResponse.json({ submission: sub }, { status: 201 });
 }
 
