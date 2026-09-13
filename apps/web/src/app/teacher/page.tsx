@@ -11,7 +11,7 @@ export default async function Teacher() {
   const queue = all<{ id: number; body: string; status: string; created_at: string; mission_title: string; student_name: string; student_email: string }>(
     `SELECT s.id, s.body, s.status, s.created_at, m.title AS mission_title, u.name AS student_name, u.email AS student_email
      FROM submissions s JOIN missions m ON m.id=s.mission_id JOIN users u ON u.id=s.user_id
-     WHERE s.status IN ('SUBMITTED','RESUBMITTED') ORDER BY s.id`);
+     WHERE s.status IN ('SUBMITTED','UNDER_REVIEW','RESUBMITTED') ORDER BY s.id`);
 
   return (
     <div className="container-db max-w-3xl py-10">

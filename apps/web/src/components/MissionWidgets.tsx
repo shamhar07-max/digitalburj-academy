@@ -2,12 +2,29 @@
 
 import { useState } from "react";
 
-type Option = { id: string; text: string; consequence: string; correct: boolean };
+type SafeOption = { id: string; text: string };
+type Verdict = { correct: boolean; consequence: string; explain: string };
 
-// Decision Lab: choose → consequence → explanation. No grades, pure judgment training.
-export function DecisionLab({ options, explain }: { options: Option[]; explain: string }) {
+// Decision Lab: choose → server verdict. Correctness never ships to the browser in advance.
+export function DecisionLab({ missionId, options }: { missionId: number; options: SafeOption[] }) {
   const [picked, setPicked] = useState<string | null>(null);
-  const chosen = options.find((o) => o.id === picked);
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function pick(id: string) {
+    setPicked(id);
+    setVerdict(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/platform/api/missions/${missionId}/answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ option_id: id }),
+      });
+      const data = await res.json();
+      if (res.ok) setVerdict(data);
+    } catch { /* verdict stays empty on network failure */ }
+    setBusy(false);
+  }
   return (
     <div className="rounded-2xl border-2 border-ink bg-panel p-6" style={{ boxShadow: "5px 5px 0 #0B6B4F" }}>
       <p className="font-mono-d text-xs font-bold uppercase tracking-[0.18em] text-cobalt">Decision lab — choose, then live with it</p>
@@ -15,10 +32,11 @@ export function DecisionLab({ options, explain }: { options: Option[]; explain: 
         {options.map((o) => (
           <button
             key={o.id}
-            onClick={() => setPicked(o.id)}
+            onClick={() => pick(o.id)}
+            disabled={busy}
             className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors ${
-              picked === o.id
-                ? o.correct
+              picked === o.id && verdict
+                ? verdict.correct
                   ? "border-cobalt bg-cobalt/10 text-ink"
                   : "border-coral bg-coral/10 text-ink"
                 : "border-hair bg-lab text-ink-soft hover:border-cobalt hover:text-ink"
@@ -28,11 +46,14 @@ export function DecisionLab({ options, explain }: { options: Option[]; explain: 
           </button>
         ))}
       </div>
-      {chosen && (
+      {picked && verdict && (
         <div className="mt-4 rounded-xl bg-lab px-4 py-3 text-sm leading-relaxed">
-          <p className="font-bold">{chosen.correct ? "✓ That holds up." : "✗ That breaks in production."} <span className="font-normal text-ink-soft">{chosen.consequence}</span></p>
-          <p className="mt-2 text-ink-soft">{explain}</p>
+          <p className="font-bold">{verdict.correct ? "✓ That holds up." : "✗ That breaks in production."} <span className="font-normal text-ink-soft">{verdict.consequence}</span></p>
+          <p className="mt-2 text-ink-soft">{verdict.explain}</p>
         </div>
+      )}
+      {picked && !verdict && (
+        <p className="mt-4 text-sm text-ink-soft">{busy ? "Checking…" : "Log in to check your judgment."}</p>
       )}
     </div>
   );
@@ -48,7 +69,7 @@ export function SubmitBox({ missionId }: { missionId: number }) {
     setBusy(true);
     setMsg("");
     const key = (globalThis.crypto?.randomUUID?.() ?? String(Date.now())) as string;
-    const res = await fetch(`/api/missions/${missionId}/submit`, {
+    const res = await fetch(`/platform/api/missions/${missionId}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Idempotency-Key": key },
       body: JSON.stringify({ body }),

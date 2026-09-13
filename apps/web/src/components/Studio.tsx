@@ -15,7 +15,7 @@ export function CompanyWidget({ initial }: { initial: { id: number; name: string
   async function create(e: React.FormEvent) {
     e.preventDefault();
     setMsg("");
-    const res = await fetch("/api/companies", {
+    const res = await fetch("/platform/api/companies", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, trade }),
@@ -60,7 +60,7 @@ export function LanguageWidget({ current }: { current: string }) {
   const router = useRouter();
 
   async function save() {
-    const res = await fetch("/api/profile", {
+    const res = await fetch("/platform/api/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ language: lang }),

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/server/auth.js";
 import { all, row } from "@/server/db.js";
 import { CompanyWidget, LanguageWidget } from "@/components/Studio";
+import { EvidenceWallet, VideoRecorder } from "@/components/PortalWidgets";
 import Link from "next/link";
 
 export default async function Dashboard() {
@@ -27,6 +28,15 @@ export default async function Dashboard() {
     "SELECT id, text, created_at FROM notifications WHERE user_id=? ORDER BY id DESC LIMIT 5", user.id);
   const companies = all<{ id: number; name: string; trade: string; stage: string }>(
     "SELECT id, name, trade, stage FROM companies WHERE user_id=? ORDER BY id", user.id);
+  const wallet = all<{ id: number; skill: string; mission: string | null; title: string; status: string; at: string }>(
+    `SELECT e.id, s.name AS skill, m.title AS mission, e.title, e.status, e.created_at AS at FROM evidence e
+     JOIN skills s ON s.code=e.skill_code LEFT JOIN submissions sub ON sub.id=e.submission_id
+     LEFT JOIN missions m ON m.id=sub.mission_id WHERE e.user_id=? ORDER BY e.id DESC`, user.id);
+  const claimable = all<{ id: number; title: string }>(
+    `SELECT s.id, m.title FROM submissions s JOIN missions m ON m.id=s.mission_id
+     WHERE s.user_id=? AND s.status IN ('APPROVED','EVIDENCE_CREATED')
+     AND NOT EXISTS (SELECT 1 FROM evidence e WHERE e.submission_id=s.id) ORDER BY s.id DESC`, user.id);
+  const skillList = all<{ code: string; name: string }>("SELECT code, name FROM skills ORDER BY name");
 
   return (
     <div className="container-db py-10">
@@ -59,6 +69,8 @@ export default async function Dashboard() {
 
         <div className="space-y-5">
           <CompanyWidget initial={companies} />
+          <EvidenceWallet evidence={wallet} claimable={claimable} skills={skillList} />
+          <VideoRecorder skills={skillList} />
           <LanguageWidget current={user.language || "en"} />
           <div className="card p-6">
             <h2 className="font-display text-lg font-extrabold">Your skills</h2>

@@ -31,10 +31,32 @@ DEFEND → SHIP → EVIDENCE. Output is verified capability, not certificates.
    `npm run curriculum:validate` before marking content complete.
 7. **Never claim completion without running**: `npm run curriculum:validate`,
    `npm --prefix apps/web run build`, `npm test`.
+8. **Answer keys never leave the server.** Option correctness/consequences/explanations
+   are evaluated in API routes; pages pass `{id, text}` only. Any new practice UI needs
+   a leak test (page HTML + API JSON must not contain correctness data).
+9. **Approval ≠ verification.** Evidence goes PENDING_REVIEW on approve; only
+   `/api/assurance` by a DIFFERENT reviewer verifies (enforced 403, tested).
+10. **Submissions are immutable rows.** New revision = new row, revision = max+1;
+    one open submission per student+mission (409); withdrawal is a state, never a delete.
+11. **Demo seed is gated.** `ALLOW_DEMO_SEED=1` for local/tests only; production DBs must
+    never contain demo accounts. Tests set the flag in the seed spawn env.
+12. **500s never leak internals.** Use `fail(rid, e)` — known statuses pass, everything
+    else logs server-side with request id and returns a generic message.
+13. **Migrations are 12-step + backfill.** CHECK changes need table rebuilds (FK off/on);
+    always backfill legacy rows (e.g. SUBMITTED→UNDER_REVIEW) and keep fresh-install
+    `schema.sql` identical in effect to migrated DBs.
+14. **Single origin.** Academy serves under `basePath: "/platform"` behind the site rewrite.
+    Client fetches use `/platform/api/*`; tests assert the proxied paths.
+15. **DB rows are normalized in `db.js`.** node:sqlite returns null-prototype objects that
+    crash Client Components — `row()`/`all()` spread to plain objects at the boundary.
+    Never pass raw driver rows to client components from anywhere else.
+16. **Video evidence is gated content.** Magic-byte sniff (never MIME), size cap
+    (`MAX_VIDEO_BYTES`), per-user quota, storage outside public dirs keyed per-database,
+    playback only through the authed route (owner/staff). Tests assert 422/413/401/403.
 
 ## Commands
-- `npm run db:migrate && npm run db:seed` — local DB + demo data
+- `ALLOW_DEMO_SEED=1 npm run db:migrate && ALLOW_DEMO_SEED=1 npm run db:seed` — local DB + demo data
 - `npm run dev` — academy web (use PORT env; default script has no -p flag)
 - `npm test` — integration suite (spawns own server + temp DB)
 - `npm run curriculum:validate` — curriculum schema/ref/prereq audit
-- Demo logins: `student@` / `teacher@` / `admin@digitalburj.com` / `demo1234`
+- Demo logins (local/test only): `student@` / `teacher@` / `admin@digitalburj.com` / `demo1234`

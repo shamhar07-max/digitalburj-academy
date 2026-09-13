@@ -13,7 +13,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    const res = await fetch(`/api/auth/${mode}`, {
+    const res = await fetch(`/platform/api/auth/${mode}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, name, password }),
@@ -42,7 +42,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       <button className="w-full rounded-xl bg-cobalt py-3 font-bold text-white hover:opacity-90">
         {mode === "login" ? "Log in" : "Create account"}
       </button>
-      <p className="font-mono-d text-center text-xs text-ink-faint">demo: student@digitalburj.com · demo1234</p>
+      {process.env.NEXT_PUBLIC_DEMO_CREDENTIALS === "1" && (
+        <p className="font-mono-d text-center text-xs text-ink-faint">demo: student@digitalburj.com · demo1234</p>
+      )}
     </form>
   );
 }

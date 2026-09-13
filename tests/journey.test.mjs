@@ -26,7 +26,7 @@ async function waitFor(base, ms = 25000) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     try {
-      const r = await fetch(`${base}/api/missions`);
+      const r = await fetch(`${base}/platform/api/missions`);
       if (r.ok) return;
     } catch {}
     await new Promise((r) => setTimeout(r, 200));
@@ -53,7 +53,7 @@ function client(base) {
     post: (p, b, h) => call("POST", p, b, h),
     patch: (p, b, h) => call("PATCH", p, b, h),
     get: (p) => call("GET", p),
-    register: (email, name, pw = "password123") => call("POST", "/api/auth/register", { email, name, password: pw }),
+    register: (email, name, pw = "password123") => call("POST", "/platform/api/auth/register", { email, name, password: pw }),
   };
 }
 
@@ -68,7 +68,7 @@ describe("academy vertical slice", () => {
     // seed demo data into the temp DB first
     const seed = spawn(process.execPath, ["src/server/seed.js"], {
       cwd: WEB,
-      env: { ...process.env, DB_PATH: dbPath },
+      env: { ...process.env, DB_PATH: dbPath, ALLOW_DEMO_SEED: "1" },
       stdio: "ignore",
     });
     await new Promise((res) => seed.on("exit", res));
@@ -97,51 +97,64 @@ describe("academy vertical slice", () => {
     r = await stu.register(email, "Test Student");
     assert.equal(r.status, 409);
     // teacher login (seeded)
-    r = await tea.post("/api/auth/login", { email: "teacher@digitalburj.com", password: "demo1234" });
+    r = await tea.post("/platform/api/auth/login", { email: "teacher@digitalburj.com", password: "demo1234" });
     assert.equal(r.status, 200);
     // missions visible
-    r = await stu.get("/api/missions");
+    r = await stu.get("/platform/api/missions");
     assert.ok(r.json.missions.length >= 4, "seeded missions present");
     const mission = r.json.missions[0];
     // submit requires idempotency key
-    r = await stu.post(`/api/missions/${mission.id}/submit`, { body: "short" }, {});
+    r = await stu.post(`/platform/api/missions/${mission.id}/submit`, { body: "short" }, {});
     // missing key → 428 (body also short, but key checked first)
     assert.equal(r.status, 428);
     const key = `k-${Date.now()}`;
-    r = await stu.post(`/api/missions/${mission.id}/submit`, { body: "x" }, { "Idempotency-Key": key });
+    r = await stu.post(`/platform/api/missions/${mission.id}/submit`, { body: "x" }, { "Idempotency-Key": key });
     assert.equal(r.status, 422, "short body rejected");
-    r = await stu.post(`/api/missions/${mission.id}/submit`,
+    r = await stu.post(`/platform/api/missions/${mission.id}/submit`,
       { body: "My approach: connect the systems with an API, verify ownership server-side, and log everything." },
       { "Idempotency-Key": key });
     assert.equal(r.status, 201);
     const subId = r.json.submission.id;
     // double submit, same key → same submission, no duplicate
-    r = await stu.post(`/api/missions/${mission.id}/submit`,
+    r = await stu.post(`/platform/api/missions/${mission.id}/submit`,
       { body: "A completely different body that must be ignored." },
       { "Idempotency-Key": key });
     assert.equal(r.status, 200);
     assert.equal(r.json.duplicate, true);
     assert.equal(r.json.submission.id, subId);
-    // teacher approves → evidence created
-    r = await tea.post("/api/reviews", { submission_id: subId, decision: "APPROVE", score: 88, feedback: "Solid reasoning." });
+    // teacher approves → evidence QUEUED for assurance (never auto-verified)
+    r = await tea.post("/platform/api/reviews", { submission_id: subId, decision: "APPROVE", score: 88, feedback: "Solid reasoning." });
     assert.equal(r.status, 200);
-    assert.ok(r.json.evidence_id, "evidence created");
-    // evidence visible to student
-    r = await stu.get("/api/evidence");
-    assert.ok(r.json.evidence.some((e) => e.id === r.json.evidence_id || e.submission_id === subId) || r.json.evidence.length >= 1);
-    assert.ok(r.json.skills.some((s) => s.level > 0), "skill bumped");
+    assert.ok(r.json.evidence_id, "evidence queued");
+    // evidence visible to student as PENDING — skill not bumped yet
+    r = await stu.get("/platform/api/evidence");
+    const ev = r.json.evidence.find((e) => e.submission_id === subId);
+    assert.ok(ev, "evidence row exists");
+    assert.equal(ev.status, "PENDING_REVIEW");
+    assert.ok(!r.json.skills.some((s) => s.level > 0), "no skill bump before assurance");
+    // approver cannot assure their own approval (separation of duties)
+    r = await tea.post("/platform/api/assurance", { evidence_id: ev.id, decision: "VERIFIED", reason: "I approved this myself, trust me." });
+    assert.equal(r.status, 403);
+    // a different reviewer (admin) verifies with a traceable reason
+    const adm = client(base);
+    await adm.post("/platform/api/auth/login", { email: "admin@digitalburj.com", password: "demo1234" });
+    r = await adm.post("/platform/api/assurance", { evidence_id: ev.id, decision: "VERIFIED", reason: "Re-ran the reasoning against the rubric; holds up." });
+    assert.equal(r.status, 200);
+    r = await stu.get("/platform/api/evidence");
+    assert.equal(r.json.evidence.find((e) => e.submission_id === subId).status, "VERIFIED");
+    assert.ok(r.json.skills.some((s) => s.level > 0), "skill bumped at assurance");
     // automated grading ran async — poll briefly
     let run = null;
     for (let i = 0; i < 20; i++) {
       await new Promise((res) => setTimeout(res, 250));
-      const g = await stu.get(`/api/grading/${subId}`);
+      const g = await stu.get(`/platform/api/grading/${subId}`);
       if (g.json.grading && g.json.grading.status !== "QUEUED") { run = g.json.grading; break; }
     }
     assert.ok(run, "grading run completed");
     assert.ok(["PASSED", "FAILED"].includes(run.status), `unexpected ${run.status}`);
     assert.ok(Array.isArray(JSON.parse(run.checks)) && JSON.parse(run.checks).length === 4);
     // talent export contract
-    r = await stu.get("/api/talent/export");
+    r = await stu.get("/platform/api/talent/export");
     assert.equal(r.status, 200);
     assert.equal(r.json.version, "talent-export-v1");
     assert.ok(r.json.skills.length >= 1 && r.json.evidence.length >= 1);
@@ -155,23 +168,23 @@ describe("academy vertical slice", () => {
     await a.register(ea, "A");
     await b.register(eb, "B");
     // student hits teacher queue → 403
-    let r = await a.get("/api/reviews");
+    let r = await a.get("/platform/api/reviews");
     assert.equal(r.status, 403);
     // student reviews someone else's submission → 403
-    r = await a.post("/api/reviews", { submission_id: 1, decision: "APPROVE" });
+    r = await a.post("/platform/api/reviews", { submission_id: 1, decision: "APPROVE" });
     assert.equal(r.status, 403);
     // unauthenticated submit → 401
     const anon = client(base);
-    r = await anon.post("/api/missions/1/submit", { body: "hello world this is long enough" }, { "Idempotency-Key": "anon-1" });
+    r = await anon.post("/platform/api/missions/1/submit", { body: "hello world this is long enough" }, { "Idempotency-Key": "anon-1" });
     assert.equal(r.status, 401);
     // grading run of another student is invisible
-    r = await b.get("/api/grading/1");
+    r = await b.get("/platform/api/grading/1");
     assert.ok([403, 404].includes(r.status), `got ${r.status}`);
     // talent export requires login
-    r = await anon.get("/api/talent/export");
+    r = await anon.get("/platform/api/talent/export");
     assert.equal(r.status, 401);
     // wrong password → 401, unknown user data stays hidden
-    r = await anon.post("/api/auth/login", { email: ea, password: "wrongpassword" });
+    r = await anon.post("/platform/api/auth/login", { email: ea, password: "wrongpassword" });
     assert.equal(r.status, 401);
   });
 
@@ -179,20 +192,20 @@ describe("academy vertical slice", () => {
     const s = client(base);
     await s.register(`w${Date.now()}@t.dev`, "W");
     // company create + duplicate guard
-    let r = await s.post("/api/companies", { name: "NOVA", trade: "logistics" });
+    let r = await s.post("/platform/api/companies", { name: "NOVA", trade: "logistics" });
     assert.equal(r.status, 201);
-    r = await s.post("/api/companies", { name: "NOVA", trade: "logistics" });
+    r = await s.post("/platform/api/companies", { name: "NOVA", trade: "logistics" });
     assert.equal(r.json.duplicate, true);
-    r = await s.post("/api/companies", { name: "X", trade: "logistics" });
+    r = await s.post("/platform/api/companies", { name: "X", trade: "logistics" });
     assert.equal(r.status, 422, "name too short rejected");
     // language allowlist
-    r = await s.patch("/api/profile", { language: "hinglish" });
+    r = await s.patch("/platform/api/profile", { language: "hinglish" });
     assert.equal(r.status, 200);
     assert.equal(r.json.language, "hinglish");
-    r = await s.patch("/api/profile", { language: "klingon" });
+    r = await s.patch("/platform/api/profile", { language: "klingon" });
     assert.equal(r.status, 422);
     // passport renders (empty state, no crash)
-    r = await s.get("/api/evidence");
+    r = await s.get("/platform/api/evidence");
     assert.equal(r.status, 200);
     assert.ok(Array.isArray(r.json.evidence));
   });
@@ -200,7 +213,7 @@ describe("academy vertical slice", () => {
   it("answer keys never leak to students", async () => {
     const s = client(base);
     await s.register(`k${Date.now()}@t.dev`, "K");
-    const r = await s.get("/api/missions/2"); // break mission has staff answer
+    const r = await s.get("/platform/api/missions/2"); // break mission has staff answer
     assert.equal(r.status, 200);
     assert.ok(!JSON.stringify(r.json).includes("verify ownership on every read"), "staff answer hidden");
   });

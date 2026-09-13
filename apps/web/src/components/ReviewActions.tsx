@@ -11,7 +11,7 @@ export function ReviewActions({ id }: { id: number }) {
 
   async function act(decision: "APPROVE" | "REQUEST_CHANGES") {
     setMsg("");
-    const res = await fetch("/api/reviews", {
+    const res = await fetch("/platform/api/reviews", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ submission_id: id, decision, score: Number(score) || null, feedback }),

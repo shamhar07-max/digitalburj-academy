@@ -1,8 +1,11 @@
-// Seed: demo accounts + starter missions. Idempotent.
+// Seed: starter missions + skills (always) and demo accounts (ONLY with explicit flag).
+// Production rule: never run with ALLOW_DEMO_SEED=1. No demo seed ⇒ no default passwords.
 import { getDb, row, run } from "./db.js";
 import { hashPassword } from "./auth.js";
 
 getDb();
+
+const DEMO = process.env.ALLOW_DEMO_SEED === "1";
 
 function ensureUser(email, name, role) {
   const e = row("SELECT id FROM users WHERE email=?", email);
@@ -12,9 +15,14 @@ function ensureUser(email, name, role) {
   return r.lastInsertRowid;
 }
 
-const student = ensureUser("student@digitalburj.com", "Ahmed Khan", "student");
-ensureUser("teacher@digitalburj.com", "Reviewer One", "teacher");
-ensureUser("admin@digitalburj.com", "Platform Owner", "admin");
+const student = DEMO ? ensureUser("student@digitalburj.com", "Ahmed Khan", "student") : null;
+if (DEMO) {
+  ensureUser("teacher@digitalburj.com", "Reviewer One", "teacher");
+  ensureUser("admin@digitalburj.com", "Platform Owner", "admin");
+  ensureUser("client@digitalburj.com", "Demo Client", "client");
+} else {
+  console.log("seed: demo accounts skipped (set ALLOW_DEMO_SEED=1 for local/test only)");
+}
 
 const courses = [
   ["DB-00", "Digital Foundations", "Start here", "Reads any digital product without feeling lost."],
@@ -40,10 +48,10 @@ const catalog = [
 ["DB-20","Client Delivery & Freelancing","Professional"],["DB-21","Business Operations & Practice","Professional"],
 ["DB-22","Professional Challenge","Master"]];
 for (const [code, name, level] of catalog) {
-  run("INSERT OR IGNORE INTO courses (code, name, level, outcome) VALUES (?,?,?,?)", code, name, level, name);
+  run("INSERT OR IGNORE INTO courses (code, name, level, outcome, status) VALUES (?,?,?,?, 'BLUEPRINT')", code, name, level, name);
 }
 for (const code of ["DB-00", "DB-01", "DB-03"]) {
-  run("INSERT OR IGNORE INTO enrollments (user_id, course_code) VALUES (?,?)", student, code);
+  if (DEMO) run("INSERT OR IGNORE INTO enrollments (user_id, course_code) VALUES (?,?)", student, code);
 }
 
 const missions = [
@@ -84,11 +92,32 @@ for (const [course, title, kind, brief, payload, diff] of missions) {
 const skills = [["web","Web Development"],["backend","Backend & APIs"],["ai","AI Engineering"],["security","Security Fundamentals"],["testing","Testing"],["product","Product Thinking"]];
 for (const [code, name] of skills) {
   run("INSERT OR IGNORE INTO skills (code, name) VALUES (?,?)", code, name);
-  run("INSERT OR IGNORE INTO student_skills (user_id, skill_code, level) VALUES (?,?,?)",
+  if (DEMO) run("INSERT OR IGNORE INTO student_skills (user_id, skill_code, level) VALUES (?,?,?)",
     student, code, code === "web" ? 62 : code === "backend" ? 41 : 18);
 }
 
-run("INSERT OR IGNORE INTO companies (id, user_id, name, trade, stage) VALUES (1,?,?,?,?)",
+if (DEMO) run("INSERT OR IGNORE INTO companies (id, user_id, name, trade, stage) VALUES (1,?,?,?,?)",
   student, "NOVA", "logistics", "website");
+
+// Ecosystem seed: demo client + project, sample job, home org. Idempotent. Demo-only.
+const clientId = DEMO ? ensureUser("client@digitalburj.com", "Demo Client", "client") : null;
+if (DEMO && !row("SELECT user_id FROM clients WHERE user_id=?", clientId)) {
+  run("INSERT INTO clients (user_id, company, contact) VALUES (?,?,?)", clientId, "Demo Trading LLC", "Demo Client");
+}
+if (DEMO && !row("SELECT id FROM projects WHERE title=?", "Demo storefront + WhatsApp pipeline")) {
+  run("INSERT INTO projects (client_id, title, status, health) VALUES (?,?, 'BUILD', 'green')",
+    clientId, "Demo storefront + WhatsApp pipeline");
+}
+if (DEMO && !row("SELECT id FROM jobs WHERE title=?", "Sample: landing page rebuild")) {
+  const admin = row("SELECT id FROM users WHERE email='admin@digitalburj.com'");
+  run("INSERT INTO jobs (title, kind, description, created_by) VALUES (?,?,?,?)",
+    "Sample: landing page rebuild", "project", "Seed sample — close or delete in Admin.", admin ? admin.id : null);
+}
+if (!row("SELECT id FROM organizations WHERE slug=?", "digital-burj")) {
+  run("INSERT INTO organizations (name, slug, status) VALUES (?,?, 'ACTIVE')", "Digital Burj", "digital-burj");
+  const admin = row("SELECT id FROM users WHERE email='admin@digitalburj.com'");
+  const org = row("SELECT id FROM organizations WHERE slug='digital-burj'");
+  if (admin && org) run("INSERT OR IGNORE INTO memberships (org_id, user_id, role) VALUES (?,?, 'OWNER')", org.id, admin.id);
+}
 
 console.log("seed ok");

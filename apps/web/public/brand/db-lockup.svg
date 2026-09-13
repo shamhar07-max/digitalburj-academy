@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 72" fill="none">
+  <rect x="2" y="4" width="64" height="64" rx="14" fill="#12332A"/>
+  <rect x="2" y="4" width="64" height="64" rx="14" stroke="#E8721C" stroke-width="2.5"/>
+  <path d="M24 17 H34 A17 17 0 0 1 34 55 H24 Z" stroke="#FAF6EE" stroke-width="3.5" fill="none" stroke-linejoin="round"/>
+  <rect x="29" y="47" width="9" height="4" rx="1" fill="#FAF6EE"/>
+  <rect x="30.2" y="41" width="6.6" height="4" rx="1" fill="#FAF6EE"/>
+  <rect x="31.4" y="35" width="4.2" height="4" rx="1" fill="#FAF6EE"/>
+  <rect x="32.4" y="29" width="2.2" height="4" rx="1" fill="#FAF6EE"/>
+  <rect x="33.1" y="22" width="1" height="6" fill="#D9481C"/>
+  <ellipse cx="34" cy="38" rx="28" ry="10" stroke="#D9481C" stroke-width="1.8" transform="rotate(-18 34 38)"/>
+  <circle cx="58.5" cy="29" r="2.6" fill="#D9481C"/>
+  <text x="82" y="35" font-family="Sora, Arial, sans-serif" font-weight="800" font-size="25" letter-spacing="1" fill="#17251F">DIGITAL<tspan fill="#8A4A06">BURJ</tspan></text>
+  <text x="82" y="55" font-family="Arial, sans-serif" font-size="11" letter-spacing="3" fill="#44554C">LEARN · BUILD · WORK · GROW</text>
+</svg>

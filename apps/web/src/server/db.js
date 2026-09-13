@@ -21,11 +21,14 @@ export function getDb() {
 }
 
 export function row(sql, ...params) {
-  return getDb().prepare(sql).get(...params);
+  const r = getDb().prepare(sql).get(...params);
+  // node:sqlite returns null-prototype objects, which Next.js refuses to
+  // serialize into Client Components. Normalize at the boundary, once.
+  return r ? { ...r } : r;
 }
 
 export function all(sql, ...params) {
-  return getDb().prepare(sql).all(...params);
+  return getDb().prepare(sql).all(...params).map((r) => ({ ...r }));
 }
 
 export function run(sql, ...params) {

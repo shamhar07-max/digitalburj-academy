@@ -13,6 +13,11 @@ export default async function MissionDetail({ params }: { params: Promise<{ id: 
     "SELECT m.*, c.name AS course_name FROM missions m JOIN courses c ON c.code=m.course_code WHERE m.id=?", id);
   if (!m) return <div className="container-db py-20">Mission not found. <Link href="/missions" className="underline">Back</Link></div>;
   const payload = JSON.parse(m.payload || "{}");
+  // Answer-key containment: strip correctness + consequences server-side.
+  // The browser receives option ids + text only; verdicts come from /answer.
+  const safeOptions = Array.isArray(payload.options)
+    ? payload.options.map((o: { id: string; text: string }) => ({ id: o.id, text: o.text }))
+    : null;
 
   return (
     <div className="container-db max-w-3xl py-10">
@@ -24,8 +29,8 @@ export default async function MissionDetail({ params }: { params: Promise<{ id: 
         {m.brief}
       </div>
 
-      {m.kind === "decision" && payload.options && (
-        <div className="mt-6"><DecisionLab options={payload.options} explain={payload.explain || ""} /></div>
+      {m.kind === "decision" && safeOptions && (
+        <div className="mt-6"><DecisionLab missionId={m.id} options={safeOptions} /></div>
       )}
       {m.kind === "break" && payload.scenario && (
         <div className="mt-6 rounded-2xl border-2 border-ink bg-panel p-6" style={{ boxShadow: "5px 5px 0 #D9481C" }}>

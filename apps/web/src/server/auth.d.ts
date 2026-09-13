@@ -1,4 +1,4 @@
-export type Role = "student" | "teacher" | "admin";
+export type Role = "student" | "teacher" | "admin" | "client";
 export type SessionUser = { id: number; email: string; name: string; role: Role; status: string; language: string };
 export function hashPassword(password: string): string;
 export function verifyPassword(password: string, stored: string): boolean;

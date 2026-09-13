@@ -35,6 +35,8 @@ export function gradeSubmission(submissionId) {
     const status = passed === checks.length ? "PASSED" : "FAILED";
     run("UPDATE grading_runs SET status=?, score=?, checks=?, updated_at=datetime('now') WHERE submission_id=?",
       status, score, JSON.stringify(checks), submissionId);
+    // Machine stage done → teacher stage. Compare-and-swap: only advance untouched rows.
+    run("UPDATE submissions SET status='UNDER_REVIEW', updated_at=datetime('now') WHERE id=? AND status='SUBMITTED'", submissionId);
     notify(sub.user_id, "grading", `Automated checks ${status.toLowerCase()} (${score}%) for submission #${submissionId} — teacher review next.`);
     return row("SELECT * FROM grading_runs WHERE submission_id=?", submissionId);
   } catch (e) {
