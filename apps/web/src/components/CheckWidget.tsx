@@ -5,7 +5,7 @@ import { useState } from "react";
 export function CheckWidget({ question, options, answer, why }: { question: string; options: string[]; answer: number; why: string }) {
   const [picked, setPicked] = useState<number | null>(null);
   return (
-    <div className="rounded-2xl border-2 border-ink bg-panel p-5" style={{ boxShadow: "4px 4px 0 #0B6B4F" }}>
+    <div className="rounded-2xl border-2 border-ink bg-panel p-5" style={{ boxShadow: "4px 4px 0 #00E0FF" }}>
       <p className="font-mono-d text-xs font-bold uppercase tracking-[0.16em] text-cobalt">Knowledge check</p>
       <p className="mt-2 font-bold">{question}</p>
       <div className="mt-3 grid gap-2">

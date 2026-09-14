@@ -21,7 +21,7 @@ export default async function Evidence() {
       <p className="font-mono-d text-xs font-semibold uppercase tracking-[0.22em] text-ink-faint">Evidence wallet</p>
       <h1 className="font-display mt-2 text-3xl font-extrabold">Proof, not promises.</h1>
 
-      <div className="card mt-6 border-2 border-ink p-6" style={{ boxShadow: "5px 5px 0 #0B6B4F" }}>
+      <div className="card mt-6 border-2 border-ink p-6" style={{ boxShadow: "5px 5px 0 #00E0FF" }}>
         <p className="font-mono-d text-xs font-bold uppercase tracking-[0.18em] text-cobalt">Capability record · DB-{String(user.id).padStart(6, "0")}</p>
         <h2 className="font-display mt-1 text-xl font-extrabold">{user.name}</h2>
         <div className="mt-4 space-y-2.5">

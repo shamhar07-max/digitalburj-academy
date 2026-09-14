@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
+import { Orbitron, Rajdhani, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/server/auth.js";
 import Link from "next/link";
 import { MobileNav } from "@/components/MobileNav";
 
-// Same families as the main site (var names kept so existing CSS is untouched).
-const sora = Space_Grotesk({ variable: "--font-sora", subsets: ["latin"], weight: ["500", "600", "700"], display: "swap" });
-const plexsans = Inter({ variable: "--font-plexsans", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
+// Same variable names as the main site (kept so existing CSS is untouched).
+const sora = Orbitron({ variable: "--font-sora", subsets: ["latin"], weight: ["500", "600", "700"], display: "swap" });
+const plexsans = Rajdhani({ variable: "--font-plexsans", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
 const plexmono = JetBrains_Mono({ variable: "--font-plexmono", subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
 
 export const metadata: Metadata = {
   title: { default: "Digital Burj Academy", template: "%s — DB Academy" },
   description: "Learn by building. Missions, submissions, review, evidence.",
-  icons: { icon: "/brand/db-icon-neo.svg" },
+  icons: { icon: "/brand/db-icon-cyber.svg" },
 };
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://digitalburj.com";
@@ -28,7 +28,7 @@ async function TopBar() {
       <div className="container-db flex h-16 items-center justify-between gap-4">
         <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="DigitalBurj Academy home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/platform/brand/db-lockup-blend.svg" alt="DigitalBurj — Learn, Build, Work, Grow, Go Global" width={400} height={120} className="h-10 w-auto sm:h-11" decoding="async" />
+          <img src="/platform/brand/db-lockup-cyber.svg" alt="DigitalBurj — Learn, Build, Work, Grow, Go Global" width={400} height={120} className="h-10 w-auto sm:h-11" decoding="async" />
           <span className="font-mono-d text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-faint">Academy</span>
         </Link>
         <nav className="hidden items-center gap-5 text-sm font-semibold text-ink-soft md:flex">

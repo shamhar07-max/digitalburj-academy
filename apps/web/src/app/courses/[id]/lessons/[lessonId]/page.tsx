@@ -14,12 +14,12 @@ export default async function LessonView({ params }: { params: Promise<{ id: str
   return (
     <div className="container-db max-w-3xl py-10">
       <Link href={`/courses/${id}`} className="font-mono-d text-xs uppercase tracking-[0.14em] text-ink-faint hover:text-cobalt">← DB-00</Link>
-      <p className="font-mono-d mt-4 rounded-xl border-l-4 border-coral bg-panel px-5 py-4 text-[15px] font-semibold leading-relaxed" style={{ borderLeftColor: "#D9481C" }}>
+      <p className="font-mono-d mt-4 rounded-xl border-l-4 border-coral bg-panel px-5 py-4 text-[15px] font-semibold leading-relaxed" style={{ borderLeftColor: "#FF2ED4" }}>
         <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.16em] text-ink-faint">Cold open</span>
         {lesson.coldOpen}
       </p>
       <h1 className="font-display mt-5 text-3xl font-extrabold tracking-tight sm:text-4xl">{lesson.title}</h1>
-      <p className="mt-3 border-l-4 border-cobalt bg-panel px-5 py-3 text-[15px] text-ink-soft" style={{ borderLeftColor: "#0B6B4F" }}>{lesson.why}</p>
+      <p className="mt-3 border-l-4 border-cobalt bg-panel px-5 py-3 text-[15px] text-ink-soft" style={{ borderLeftColor: "#00E0FF" }}>{lesson.why}</p>
 
       <h2 className="font-display mt-8 text-xl font-extrabold">The concept, short</h2>
       <div className="mt-3 space-y-3 text-[15px] leading-relaxed text-ink-soft">
@@ -51,7 +51,7 @@ export default async function LessonView({ params }: { params: Promise<{ id: str
         <CheckWidget question={lesson.check.question} options={lesson.check.options} answer={lesson.check.answer} why={lesson.check.why} />
       </div>
 
-      <div className="mt-6 rounded-2xl border-2 border-ink bg-panel p-5" style={{ boxShadow: "4px 4px 0 #0B6B4F" }}>
+      <div className="mt-6 rounded-2xl border-2 border-ink bg-panel p-5" style={{ boxShadow: "4px 4px 0 #00E0FF" }}>
         <p className="font-mono-d text-[11px] font-bold uppercase tracking-[0.14em] text-tealx">Evidence for this lesson</p>
         <p className="mt-1.5 text-sm font-semibold">{lesson.evidence}</p>
         {lesson.recall && <p className="font-mono-d mt-2 text-xs text-ink-faint">Recall: {lesson.recall}</p>}
