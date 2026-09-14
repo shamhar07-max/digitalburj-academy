@@ -33,7 +33,7 @@ export default async function MissionDetail({ params }: { params: Promise<{ id: 
         <div className="mt-6"><DecisionLab missionId={m.id} options={safeOptions} /></div>
       )}
       {m.kind === "break" && payload.scenario && (
-        <div className="mt-6 rounded-2xl border-2 border-ink bg-panel p-6" style={{ boxShadow: "5px 5px 0 #FF2ED4" }}>
+        <div className="mt-6 rounded-2xl border-2 border-ink bg-panel p-6" style={{ boxShadow: "5px 5px 0 #FF6BD6" }}>
           <p className="font-mono-d text-xs font-bold uppercase tracking-[0.18em] text-coral">Break lab — incident</p>
           <p className="mt-3 text-[15px] leading-relaxed">{payload.scenario}</p>
           {staff && <p className="mt-3 rounded-xl bg-lab px-4 py-3 text-sm text-ink-soft">Staff reference: {payload.answer}</p>}

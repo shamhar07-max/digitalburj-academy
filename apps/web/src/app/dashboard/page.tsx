@@ -44,7 +44,7 @@ export default async function Dashboard() {
       <h1 className="font-display mt-2 text-3xl font-extrabold sm:text-4xl">Good to see you, {user.name.split(" ")[0]}.</h1>
 
       <div className="mt-8 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-        <div className="card border-2 border-ink p-7" style={{ boxShadow: "6px 6px 0 #FF2ED4" }}>
+        <div className="card border-2 border-ink p-7" style={{ boxShadow: "6px 6px 0 #FF6BD6" }}>
           <p className="font-mono-d text-xs font-semibold uppercase tracking-[0.2em] text-coral">Current mission</p>
           {nextMission ? (
             <>

@@ -26,7 +26,7 @@ export function DecisionLab({ missionId, options }: { missionId: number; options
     setBusy(false);
   }
   return (
-    <div className="rounded-2xl border-2 border-ink bg-panel p-6" style={{ boxShadow: "5px 5px 0 #00E0FF" }}>
+    <div className="rounded-2xl border-2 border-ink bg-panel p-6" style={{ boxShadow: "5px 5px 0 #18B8D6" }}>
       <p className="font-mono-d text-xs font-bold uppercase tracking-[0.18em] text-cobalt">Decision lab — choose, then live with it</p>
       <div className="mt-4 grid gap-2.5">
         {options.map((o) => (

@@ -47,7 +47,7 @@ export default async function CourseDetail({ params }: { params: Promise<{ id: s
         ))}
       </div>
 
-      <div className="card mt-6 border-2 border-ink p-6" style={{ boxShadow: "5px 5px 0 #00E0FF" }}>
+      <div className="card mt-6 border-2 border-ink p-6" style={{ boxShadow: "5px 5px 0 #18B8D6" }}>
         <p className="font-mono-d text-xs font-bold uppercase tracking-[0.16em] text-coral">Final project</p>
         <p className="mt-2 font-bold">{course.finalProject}</p>
         <p className="font-mono-d mt-3 text-xs text-ink-faint">Evidence: {course.evidence.join(" · ")}</p>
