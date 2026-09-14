@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { run, row } from "./db.js";
 import { randomUUID } from "node:crypto";
 
+import { rateLimit, capabilityBand } from "./util.js";
+
+export { rateLimit, capabilityBand };
+
 export function requestId() {
   return randomUUID().slice(0, 8);
 }
@@ -58,18 +62,6 @@ export function clearFails(email) {
   fails.delete(String(email || "").toLowerCase());
 }
 
-// Capability bands: system-computed from verified-work levels. Bands describe,
-// reviewers verify — a band is never proof by itself.
-export function capabilityBand(level) {
-  const l = Number(level) || 0;
-  if (l <= 0) return "UNRATED";
-  if (l < 25) return "FOUNDATIONAL";
-  if (l < 50) return "WORKING";
-  if (l < 75) return "INDEPENDENT";
-  if (l < 90) return "ADVANCED";
-  return "EXPERT";
-}
-
 /** Read session user from request cookies (route handlers). */
 export async function sessionFromRequest(req, getSessionUser) {
   const token = req.cookies.get("db_academy")?.value;
@@ -83,19 +75,16 @@ export function clientIp(req) {
   return "local";
 }
 
-// In-memory sliding-window limiter (single-node stage; move to Redis with Postgres).
-const buckets = new Map();
-export function rateLimit(key, limit, windowMs) {
-  const now = Date.now();
-  const seen = (buckets.get(key) || []).filter((t) => now - t < windowMs);
-  if (seen.length >= limit) {
-    buckets.set(key, seen);
-    return false;
-  }
-  seen.push(now);
-  buckets.set(key, seen);
-  return true;
+// Does this user have an ACTIVE membership in the owning org of this project?
+// Clients see their own projects regardless; org members get access via the org.
+export async function isOrgProjectCaller(project, user) {
+  const { row } = await import("./db.js");
+  if (!project.org_id) return false;
+  const m = row("SELECT 1 FROM memberships WHERE org_id=? AND user_id=? AND status='ACTIVE'", project.org_id, user.id);
+  return !!m;
 }
+
+// Limiter implementation lives in util.js (dependency-free, unit-tested).
 export function limited(req, scope, limit, windowMs = 60000) {
   return !rateLimit(`${scope}:${clientIp(req)}`, limit, windowMs);
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/server/auth.js";
-import { all, row, run } from "@/server/db.js";
+import { all, row, run, transaction } from "@/server/db.js";
 import { deny, audit, requestId, requireRole, notify } from "@/server/guard.js";
 
 // Independent assurance: a SECOND reviewer (never the approver) verifies evidence.
@@ -48,16 +48,19 @@ export async function POST(req: Request) {
   if (!reason || String(reason).trim().length < 10) {
     return NextResponse.json({ error: "A verification reason is required (10+ chars) — traceability is the point" }, { status: 422 });
   }
-  run("UPDATE evidence SET status=?, note=? WHERE id=?", decision, String(reason).slice(0, 1000), evidence_id);
-  run("INSERT INTO assurance_decisions (evidence_id, reviewer_id, decision, reason) VALUES (?,?,?,?)",
-    evidence_id, user!.id, decision, String(reason).slice(0, 1000));
-  if (decision === "VERIFIED") {
-    run("UPDATE submissions SET status='EVIDENCE_CREATED', updated_at=datetime('now') WHERE id=?", ev.submission_id);
-    run("INSERT OR IGNORE INTO student_skills (user_id, skill_code, level) VALUES (?,?,0)", ev.user_id, ev.skill_code);
-    const cur = row<{ level: number }>("SELECT level FROM student_skills WHERE user_id=? AND skill_code=?", ev.user_id, ev.skill_code);
-    run("UPDATE student_skills SET level=MIN(100, COALESCE(?,0)+8), updated_at=datetime('now') WHERE user_id=? AND skill_code=?",
-      cur?.level ?? 0, ev.user_id, ev.skill_code);
-  }
+  // Atomic: status flip + decision record + (on verify) submission close + skill bump.
+  transaction(() => {
+    run("UPDATE evidence SET status=?, note=? WHERE id=?", decision, String(reason).slice(0, 1000), evidence_id);
+    run("INSERT INTO assurance_decisions (evidence_id, reviewer_id, decision, reason) VALUES (?,?,?,?)",
+      evidence_id, user!.id, decision, String(reason).slice(0, 1000));
+    if (decision === "VERIFIED") {
+      run("UPDATE submissions SET status='EVIDENCE_CREATED', updated_at=datetime('now') WHERE id=?", ev.submission_id);
+      run("INSERT OR IGNORE INTO student_skills (user_id, skill_code, level) VALUES (?,?,0)", ev.user_id, ev.skill_code);
+      const cur = row<{ level: number }>("SELECT level FROM student_skills WHERE user_id=? AND skill_code=?", ev.user_id, ev.skill_code);
+      run("UPDATE student_skills SET level=MIN(100, COALESCE(?,0)+8), updated_at=datetime('now') WHERE user_id=? AND skill_code=?",
+        cur?.level ?? 0, ev.user_id, ev.skill_code);
+    }
+  });
   audit(user!.id, "assure", "evidence", evidence_id, ev.status, decision, rid);
   notify(ev.user_id, "assurance", `Evidence #${evidence_id} ${decision.toLowerCase()} by independent review.`);
   return NextResponse.json({ ok: true });

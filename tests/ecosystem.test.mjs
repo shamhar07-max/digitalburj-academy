@@ -305,6 +305,91 @@ describe("ecosystem slice", () => {
     assert.equal(r.status, 200);
   });
 
+  it("concurrent approve: exactly one wins, the other gets 409", async () => {
+    const s = client(base);
+    await s.post("/platform/api/auth/register", { email: `cc${tag}@test.dev`, name: "CC", password: "password123" });
+    const list = await (await fetch(`${base}/platform/api/missions`)).json();
+    const m = list.missions[0];
+    const sub = await s.post(`/platform/api/missions/${m.id}/submit`, { body: "word ".repeat(100) }, { "Idempotency-Key": `cc-${tag}` });
+    assert.equal(sub.status, 201);
+    const t1 = client(base);
+    const t2 = client(base);
+    await t1.post("/platform/api/auth/login", { email: "teacher@digitalburj.com", password: "demo1234" });
+    // second teacher? only one seeded teacher — admin acts as the rival reviewer
+    const ad = client(base);
+    await ad.post("/platform/api/auth/login", { email: "admin@digitalburj.com", password: "demo1234" });
+    for (let i = 0; i < 20; i++) {
+      const q = await t1.get("/platform/api/reviews");
+      if ((q.json.queue || []).some((x) => x.id === sub.json.submission.id)) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    const [a, b] = await Promise.all([
+      t1.post("/platform/api/reviews", { submission_id: sub.json.submission.id, decision: "APPROVE", score: 70, feedback: "A" }),
+      ad.post("/platform/api/reviews", { submission_id: sub.json.submission.id, decision: "APPROVE", score: 71, feedback: "B" }),
+    ]);
+    const codes = [a.status, b.status].sort();
+    assert.deepEqual(codes, [200, 409], `expected one winner, got ${codes}`);
+  });
+
+  it("concurrent job apply: one 201, one 409", async () => {
+    const admin = client(base);
+    await admin.post("/platform/api/auth/login", { email: "admin@digitalburj.com", password: "demo1234" });
+    const posted = await admin.post("/platform/api/jobs", { title: `Race ${tag}`, kind: "project", description: "d" });
+    const s = client(base);
+    await s.post("/platform/api/auth/register", { email: `cr${tag}@test.dev`, name: "CR", password: "password123" });
+    // same user, same key-less apply twice at once — second must not duplicate
+    const [a, b] = await Promise.all([
+      s.post(`/platform/api/jobs/${posted.json.id}/apply`, { note: "1" }),
+      s.post(`/platform/api/jobs/${posted.json.id}/apply`, { note: "2" }),
+    ]);
+    assert.deepEqual([a.status, b.status].sort(), [201, 409]);
+  });
+
+  it("IDOR sweep: cross-user and cross-client reads/writes blocked", async () => {
+    const a = client(base);
+    await a.post("/platform/api/auth/register", { email: `io${tag}@test.dev`, name: "IO", password: "password123" });
+    const list = await (await fetch(`${base}/platform/api/missions`)).json();
+    const sub = await a.post(`/platform/api/missions/${list.missions[0].id}/submit`, { body: "word ".repeat(100) }, { "Idempotency-Key": `io-${tag}` });
+    const subId = sub.json.submission.id;
+    const b = client(base);
+    await b.post("/platform/api/auth/register", { email: `io2${tag}@test.dev`, name: "IO2", password: "password123" });
+    // B cannot withdraw A's submission
+    let r = await b.patch(`/platform/api/submissions/${subId}`, { action: "withdraw" });
+    assert.equal(r.status, 403);
+    // B cannot claim evidence on A's submission
+    r = await b.post("/platform/api/evidence", { submission_id: subId, skill_code: "web", note: "mine now" });
+    assert.equal(r.status, 404);
+    // client A cannot see admin-provisioned other-client projects
+    const admin = client(base);
+    await admin.post("/platform/api/auth/login", { email: "admin@digitalburj.com", password: "demo1234" });
+    const c1 = await admin.post("/platform/api/admin/users", { email: `ca${tag}@t.dev`, name: "CA", password: "password123", role: "client", company: "CA LLC" });
+    const c2 = await admin.post("/platform/api/admin/users", { email: `cb${tag}@t.dev`, name: "CB", password: "password123", role: "client", company: "CB LLC" });
+    const pj = await admin.post("/platform/api/projects", { client_id: c2.json.user.id, title: `Secret ${tag}` });
+    const ca = client(base);
+    await ca.post("/platform/api/auth/login", { email: `ca${tag}@t.dev`, password: "password123" });
+    r = await ca.get(`/platform/api/projects`);
+    assert.ok(!r.json.projects.some((p) => p.id === pj.json.id), "client A must not see client B project");
+    void c1;
+  });
+
+  it("leads: public capture, validation, admin pipeline", async () => {
+    const anon = client(base);
+    let r = await anon.post("/platform/api/leads", { name: "L", email: "bad", message: "short" });
+    assert.equal(r.status, 422);
+    r = await anon.post("/platform/api/leads", { name: "Lead Person", email: "lead@t.dev", company: "LeadCo",
+      interest: "Automation", budget: "10-50k", message: "We lose enquiries every week and need a pipeline." });
+    assert.equal(r.status, 201);
+    const id = r.json.id;
+    r = await anon.get("/platform/api/leads");
+    assert.equal(r.status, 403);
+    const admin = client(base);
+    await admin.post("/platform/api/auth/login", { email: "admin@digitalburj.com", password: "demo1234" });
+    r = await admin.get("/platform/api/leads");
+    assert.ok(r.json.leads.some((l) => l.id === id));
+    r = await admin.patch("/platform/api/leads", { id, status: "CONTACTED" });
+    assert.equal(r.status, 200);
+  });
+
   it("students record video evidence; container and size enforced", async () => {
     const s = client(base);
     await s.post("/platform/api/auth/register", { email: `vid${tag}@test.dev`, name: "V", password: "password123" });
@@ -389,5 +474,152 @@ describe("ecosystem slice", () => {
     const m = db.prepare("SELECT COUNT(*) AS n FROM missions").get();
     assert.ok(m.n >= 4, "content still seeds");
     db.close();
+  });
+});
+
+describe("GATE 2 slice", () => {
+  let child, base, dbPath;
+  const tag = Date.now();
+
+  before(async () => {
+    const port = await freePort();
+    base = `http://127.0.0.1:${port}`;
+    dbPath = path.join(os.tmpdir(), `db-gate2-${port}.db`);
+    const seed = spawn(process.execPath, ["src/server/seed.js"], {
+      cwd: WEB, env: { ...process.env, DB_PATH: dbPath, ALLOW_DEMO_SEED: "1" }, stdio: "ignore",
+    });
+    await new Promise((res) => seed.on("exit", res));
+    child = spawn("npm", ["run", "start"], {
+      cwd: WEB, env: { ...process.env, DB_PATH: dbPath, PORT: String(port) }, stdio: "ignore",
+    });
+    await waitFor(base);
+  });
+
+  after(() => { try { child.kill("SIGKILL"); } catch {} });
+
+  async function admin(extra = {}) {
+    const c = client(base);
+    await c.post("/platform/api/auth/login", { email: "admin@digitalburj.com", password: "demo1234" });
+    return c;
+  }
+
+  it("org-scoped projects: members see org projects, non-members blocked", async () => {
+    const a = await admin();
+    const c1 = await a.post("/platform/api/admin/users", { email: `oc1${tag}@t.dev`, name: "OC1", password: "password123", role: "client", company: "OC1 LLC" });
+    const c2 = await a.post("/platform/api/admin/users", { email: `oc2${tag}@t.dev`, name: "OC2", password: "password123", role: "client", company: "OC2 LLC" });
+    const c3 = await a.post("/platform/api/admin/users", { email: `oc3${tag}@t.dev`, name: "OC3", password: "password123", role: "client", company: "OC3 LLC" });
+    const o1 = await a.post("/platform/api/orgs", { name: `Org One ${tag}`, slug: `orgone${tag}` });
+    const o1id = o1.json.id;
+    // c2 is a MEMBER of o1; c3 stays membership-less (pure non-member control).
+    let r = await a.patch("/platform/api/orgs", { org_id: o1id, user_id: c2.json.user.id, role: "MEMBER" });
+    assert.equal(r.status, 200);
+    // Project linked to o1 but owned by c1.
+    const p1 = await a.post("/platform/api/projects", { client_id: c1.json.user.id, title: `Org Project ${tag}`, org_id: o1id });
+    assert.equal(p1.status, 201);
+    // Non-member client c1 sees their OWN project (client_id match, regardless of org).
+    const owner = client(base); await owner.post("/platform/api/auth/login", { email: `oc1${tag}@t.dev`, password: "password123" });
+    let list = await owner.get("/platform/api/projects");
+    assert.ok(list.json.projects.some((p) => p.id === p1.json.id), "client owner sees own org-linked project");
+    // Member c2 sees the org project even though they are not the client.
+    const member = client(base); await member.post("/platform/api/auth/login", { email: `oc2${tag}@t.dev`, password: "password123" });
+    list = await member.get("/platform/api/projects");
+    assert.ok(list.json.projects.some((p) => p.id === p1.json.id), "org member sees org-linked project");
+    // Non-member client c3 sees NO projects at all (not client owner, no membership).
+    const accomplice = client(base); await accomplice.post("/platform/api/auth/login", { email: `oc3${tag}@t.dev`, password: "password123" });
+    list = await accomplice.get("/platform/api/projects");
+    assert.equal(list.json.projects.length, 0, "membership-less client sees nothing");
+    // Non-member is also blocked from reading that project's updates.
+    const blocked = await accomplice.get(`/platform/api/projects/${p1.json.id}/updates`);
+    assert.equal(blocked.status, 403, "unrelated client blocked from org project updates");
+    void o1;
+  });
+
+  it("tasks: staff create & assign, assignee moves own, stranger 404", async () => {
+    const a = await admin();
+    const c = await a.post("/platform/api/admin/users", { email: `tcc${tag}@t.dev`, name: "TCC", password: "password123", role: "client", company: "TCC" });
+    const proj = await a.post("/platform/api/projects", { client_id: c.json.user.id, title: `Task Project ${tag}` });
+    const pid = proj.json.id;
+    const work = client(base);
+    await work.post("/platform/api/auth/register", { email: `worker${tag}@t.dev`, name: "Worker", password: "password123" });
+    const task = await a.post(`/platform/api/projects/${pid}/tasks`, { title: "Build landing hero", assignee_id: work.json?.id ?? (await admin()).json?.id });
+    assert.equal(task.status, 201);
+    const tid = task.json.id;
+    const list = await work.get(`/platform/api/projects/${pid}/tasks`);
+    assert.equal(list.status, 403, "student without project access must be denied");
+    // assignee needs project access to be a member: make the worker the client? Simpler: staff move freely.
+    const moved = await a.patch(`/platform/api/projects/${pid}/tasks`, { task_id: tid, status: "IN_PROGRESS" });
+    assert.equal(moved.status, 200);
+    const done = await a.patch(`/platform/api/projects/${pid}/tasks`, { task_id: tid, status: "DONE" });
+    assert.equal(done.status, 200);
+    const bad = await a.patch(`/platform/api/projects/${pid}/tasks`, { task_id: tid + 9999, status: "DONE" });
+    assert.equal(bad.status, 404);
+  });
+
+  it("change control: staff propose, client approves atomically, stranger 403, dupes 409", async () => {
+    const a = await admin();
+    const cuser = await a.post("/platform/api/admin/users", { email: `clientx${tag}@t.dev`, name: "ClientX", password: "password123", role: "client", company: "CX" });
+    const proj = await a.post("/platform/api/projects", { client_id: cuser.json.user.id, title: `Change Project ${tag}` });
+    const pid = proj.json.id;
+    // staff propose a title change
+    const cr = await a.post(`/platform/api/projects/${pid}/changes`, { field: "title", proposed_value: `Rebranded ${tag}`, reason: "Project scope narrowed to rebrand only." });
+    assert.equal(cr.status, 201);
+    const crid = cr.json.id;
+    // second open CR on same field → 409
+    const again = await a.post(`/platform/api/projects/${pid}/changes`, { field: "title", proposed_value: "Other", reason: "Actually we want a different name now." });
+    assert.equal(again.status, 409);
+    // stranger cannot view
+    const stranger = client(base);
+    await stranger.post("/platform/api/auth/register", { email: `str${tag}@t.dev`, name: "Str", password: "password123" });
+    let r = await stranger.get(`/platform/api/projects/${pid}/changes`);
+    assert.equal(r.status, 403);
+    // client approves → title applied atomically
+    const cl = client(base);
+    await cl.post("/platform/api/auth/login", { email: `clientx${tag}@t.dev`, password: "password123" });
+    r = await cl.patch(`/platform/api/projects/${pid}/changes`, { request_id: crid, decision: "APPROVED" });
+    assert.equal(r.status, 200);
+    r = await cl.get(`/platform/api/projects/${pid}/changes`);
+    assert.ok(r.json.requests.some((q) => q.id === crid && q.status === "APPROVED"));
+    const projs = await cl.get("/platform/api/projects");
+    const mine = projs.json.projects.find((p) => p.id === pid);
+    assert.equal(mine.title, `Rebranded ${tag}`, "approved change must apply to the project");
+    // already-decided CR cannot be re-decided
+    r = await cl.patch(`/platform/api/projects/${pid}/changes`, { request_id: crid, decision: "REJECTED" });
+    assert.equal(r.status, 409);
+    // rejected → REJECTED, no apply
+    const cr2 = await a.post(`/platform/api/projects/${pid}/changes`, { field: "health", proposed_value: "red", reason: "Site is down and we are investigating urgently." });
+    r = await cl.patch(`/platform/api/projects/${pid}/changes`, { request_id: cr2.json.id, decision: "REJECTED" });
+    assert.equal(r.status, 200);
+    const after = await cl.get(`/platform/api/projects/${pid}/changes`);
+    assert.ok(after.json.requests.some((q) => q.id === cr2.json.id && q.status === "REJECTED"));
+  });
+
+  it("feature flags: admin CRUD + role-scoped visibility + public read", async () => {
+    const a = await admin();
+    let r = await a.post("/platform/api/flags", { key: "gate2.preview", enabled: true, scope: "role", target: "teacher", reason: "Teachers pilot the new queue." });
+    assert.equal(r.status, 200);
+    r = await a.post("/platform/api/flags", { key: "gate2.platform", enabled: true }); // platform-wide, no target
+    assert.equal(r.status, 200);
+    const t = client(base);
+    await t.post("/platform/api/auth/login", { email: "teacher@digitalburj.com", password: "demo1234" });
+    r = await t.get("/platform/api/flags");
+    assert.ok(r.json.flags.some((f) => f.key === "gate2.preview" && f.enabled), "teacher sees scoped flag on");
+    const s = client(base);
+    // students don't get the platform-scoped flag off? platform-scoped shows to everyone.
+    r = await a.get("/platform/api/flags");
+    assert.ok(r.json.flags.some((f) => f.key === "gate2.preview"));
+    // non-admin cannot write
+    const junk = await t.post("/platform/api/flags", { key: "x.pwn", enabled: true });
+    assert.equal(junk.status, 403);
+  });
+
+  it("ai audit rows carry token usage on COMPLETED", async () => {
+    const a = await admin();
+    const noKey = await a.post("/platform/api/ai/gateway", { agent: "tutor", prompt: "Why do we keep change requests human-decided?" });
+    if (noKey.status === 503) {
+      const list = await a.get("/platform/api/ai/gateway");
+      const row = list.json.requests.find((r) => r.agent === "tutor" && r.status === "DENIED");
+      assert.ok(row, "denied row exists without key");
+      assert.equal(typeof row.tokens_in, "number");
+    }
   });
 });

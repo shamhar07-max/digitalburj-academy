@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createUser, createSession, cookieHeader } from "@/server/auth.js";
 import { run } from "@/server/db.js";
-import { audit, requestId, limited } from "@/server/guard.js";
+import { audit, requestId, limited, fail } from "@/server/guard.js";
 
 export async function POST(req: Request) {
   const rid = requestId();
@@ -22,7 +22,6 @@ export async function POST(req: Request) {
     res.headers.set("Set-Cookie", cookieHeader(token, expiresAt));
     return res;
   } catch (e: unknown) {
-    const err = e as Error & { status?: number };
-    return NextResponse.json({ error: err.message }, { status: err.status ?? 500 });
+    return fail(rid, e, "register");
   }
 }

@@ -39,8 +39,11 @@ export async function POST(req: Request) {
     if (!res.ok) throw new Error(`provider ${res.status}`);
     const data = await res.json();
     const text = data.choices?.[0]?.message?.content || "";
-    const r = run("INSERT INTO ai_requests (user_id, agent, purpose, status, detail) VALUES (?,?,?,?,?)",
-      user!.id, agent, String(purpose || "").slice(0, 200), "COMPLETED", `rid=${rid}`);
+    const ti = Number(data.usage?.prompt_tokens || 0);
+    const to = Number(data.usage?.completion_tokens || 0);
+    // 0 known so far; a provider-priced per-1k rate can be layered in without schema change.
+    const r = run("INSERT INTO ai_requests (user_id, agent, purpose, status, detail, tokens_in, tokens_out) VALUES (?,?,?,?,?,?,?)",
+      user!.id, agent, String(purpose || "").slice(0, 200), "COMPLETED", `rid=${rid}`, ti, to);
     audit(user!.id, "ai_complete", "ai_request", r.lastInsertRowid, agent, "COMPLETED", rid);
     return NextResponse.json({ text });
   } catch (e: unknown) {

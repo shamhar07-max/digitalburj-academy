@@ -207,6 +207,7 @@ CREATE TABLE IF NOT EXISTS clients (
 CREATE TABLE IF NOT EXISTS projects (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   client_id INTEGER NOT NULL REFERENCES users(id),
+  org_id INTEGER REFERENCES organizations(id),
   title TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'DISCOVERY' CHECK (status IN ('LEAD','DISCOVERY','BUILD','REVIEW','LIVE','OPERATING','COMPLETED')),
   health TEXT NOT NULL DEFAULT 'green' CHECK (health IN ('green','amber','red')),
@@ -250,6 +251,19 @@ CREATE TABLE IF NOT EXISTS assurance_decisions (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Leads: production lead capture (site form posts here; mailto is fallback only).
+CREATE TABLE IF NOT EXISTS leads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  company TEXT NOT NULL DEFAULT '',
+  interest TEXT NOT NULL DEFAULT '',
+  budget TEXT NOT NULL DEFAULT '',
+  message TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'NEW' CHECK (status IN ('NEW','CONTACTED','WON','LOST')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- AI gateway audit: every assisted call logged; no key = 503, never silent failure.
 CREATE TABLE IF NOT EXISTS ai_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -258,5 +272,51 @@ CREATE TABLE IF NOT EXISTS ai_requests (
   purpose TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'DENIED' CHECK (status IN ('COMPLETED','DENIED','ERROR')),
   detail TEXT NOT NULL DEFAULT '',
+  tokens_in INTEGER NOT NULL DEFAULT 0,
+  tokens_out INTEGER NOT NULL DEFAULT 0,
+  cost_cents INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Feature flags: platform + role-scoped toggles read by gate page/route helpers.
+-- Ontology: `scope` distinguishes platform wide vs role; default governs fallback.
+CREATE TABLE IF NOT EXISTS feature_flags (
+  key TEXT PRIMARY KEY,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  scope TEXT NOT NULL DEFAULT 'platform' CHECK (scope IN ('platform','role','org','user')),
+  target TEXT NOT NULL DEFAULT '',
+  default_state INTEGER NOT NULL DEFAULT 0,
+  reason TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_flags_scope ON feature_flags(scope, target);
+
+-- Project tasks: scoped, assignable work items on a client project.
+-- Status: TODO → IN_PROGRESS → DONE (with BLOCKED as a state, not a dead-end).
+CREATE TABLE IF NOT EXISTS project_tasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  title TEXT NOT NULL,
+  assignee_id INTEGER REFERENCES users(id),
+  status TEXT NOT NULL DEFAULT 'TODO' CHECK (status IN ('TODO','IN_PROGRESS','BLOCKED','DONE')),
+  created_by INTEGER NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_project ON project_tasks(project_id);
+
+-- Change requests: scoped edits to a project (scope, status, health, title) that
+-- the owning client approves. PREVIEW_SUBMITTED → APPROVED / REJECTED (+REVOKED).
+CREATE TABLE IF NOT EXISTS change_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  created_by INTEGER NOT NULL REFERENCES users(id),
+  field TEXT NOT NULL CHECK (field IN ('title','status','health') OR field LIKE 'custom:%'),
+  current_value TEXT NOT NULL DEFAULT '',
+  proposed_value TEXT NOT NULL DEFAULT '',
+  reason TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'PREVIEW_SUBMITTED' CHECK (status IN ('PREVIEW','PREVIEW_SUBMITTED','APPROVED','REJECTED')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_cr_project ON change_requests(project_id);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/server/auth.js";
-import { row, all, run } from "@/server/db.js";
+import { row, all, run, transaction } from "@/server/db.js";
 import { deny, requireRole, audit, notify, requestId } from "@/server/guard.js";
 
 // Teacher/admin review queue
@@ -37,23 +37,24 @@ export async function POST(req: Request) {
   }
   const before = sub.status;
   if (decision === "APPROVE") {
-    run("UPDATE submissions SET status='APPROVED', score=?, updated_at=datetime('now') WHERE id=? AND status IN ('SUBMITTED','UNDER_REVIEW','RESUBMITTED')",
-      score ?? null, sub.id);
-    const chk = row<{ status: string }>("SELECT status FROM submissions WHERE id=?", sub.id);
-    if (chk?.status !== "APPROVED") return NextResponse.json({ error: "State changed concurrently — refresh" }, { status: 409 });
-    run("INSERT INTO reviews (submission_id, reviewer_id, decision, score, feedback) VALUES (?,?,?,?,?)",
-      sub.id, user.id, decision, score ?? null, feedback ?? "");
-    // Evidence enters the queue UNVERIFIED. Assurance (a different reviewer) verifies.
-    const ev = row<{ id: number }>("SELECT id FROM evidence WHERE submission_id=?", sub.id);
-    let evidenceId = ev?.id;
-    if (!evidenceId) {
+    // Atomic: approval + review row + queued evidence land together or not at all.
+    const evidenceId = transaction(() => {
+      run("UPDATE submissions SET status='APPROVED', score=?, updated_at=datetime('now') WHERE id=? AND status IN ('SUBMITTED','UNDER_REVIEW','RESUBMITTED')",
+        score ?? null, sub.id);
+      const chk = row<{ status: string }>("SELECT status FROM submissions WHERE id=?", sub.id);
+      if (chk?.status !== "APPROVED") throw Object.assign(new Error("State changed concurrently — refresh"), { status: 409 });
+      run("INSERT INTO reviews (submission_id, reviewer_id, decision, score, feedback) VALUES (?,?,?,?,?)",
+        sub.id, user.id, decision, score ?? null, feedback ?? "");
+      // Evidence enters the queue UNVERIFIED. Assurance (a different reviewer) verifies.
+      const ev = row<{ id: number }>("SELECT id FROM evidence WHERE submission_id=?", sub.id);
+      if (ev?.id) return ev.id;
       const mission = row<{ course_code: string }>("SELECT course_code FROM missions WHERE id=?", sub.mission_id);
       const skillMap: Record<string, string> = { "DB-00": "product", "DB-01": "product", "DB-03": "backend", "DB-12": "ai" };
       const skill = skillMap[mission?.course_code ?? ""] ?? "product";
       const r = run("INSERT INTO evidence (user_id, submission_id, skill_code, status, note) VALUES (?,?,?,'PENDING_REVIEW',?)",
         sub.user_id, sub.id, skill, `Approved by ${user.name} — awaiting independent assurance`);
-      evidenceId = r.lastInsertRowid;
-    }
+      return r.lastInsertRowid;
+    });
     audit(user.id, "approve", "submission", sub.id, before, "APPROVED", rid);
     notify(sub.user_id, "review", `Submission #${sub.id} approved — evidence #${evidenceId} queued for independent assurance.`);
     return NextResponse.json({ ok: true, evidence_id: evidenceId });

@@ -39,3 +39,17 @@ export function run(sql, ...params) {
 export function dbPath() {
   return DB_PATH;
 }
+
+/** Atomic multi-record writes. A crash mid-flow rolls back — never half-approve. */
+export function transaction(fn) {
+  const conn = getDb();
+  conn.exec("BEGIN IMMEDIATE");
+  try {
+    const out = fn();
+    conn.exec("COMMIT");
+    return out;
+  } catch (e) {
+    try { conn.exec("ROLLBACK"); } catch { /* already rolled back */ }
+    throw e;
+  }
+}

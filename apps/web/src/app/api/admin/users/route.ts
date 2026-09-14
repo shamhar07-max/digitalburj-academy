@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSessionUser, createUser } from "@/server/auth.js";
-import { run } from "@/server/db.js";
-import { deny, audit, requestId, requireRole } from "@/server/guard.js";
+import { run, transaction } from "@/server/db.js";
+import { deny, audit, requestId, requireRole, fail } from "@/server/guard.js";
 
 // Admin provisions any role incl. clients. Passwords hashed; everything audited.
 export async function POST(req: Request) {
@@ -15,15 +15,17 @@ export async function POST(req: Request) {
   if (!["student", "teacher", "admin", "client"].includes(role)) return NextResponse.json({ error: "Bad role" }, { status: 422 });
   if (String(password).length < 8) return NextResponse.json({ error: "Password must be 8+ chars" }, { status: 422 });
   try {
-    const created = createUser(email, name, password, role);
-    if (role === "client") {
-      run("INSERT INTO clients (user_id, company, contact) VALUES (?,?,?)",
-        created.id, String(company || name).slice(0, 160), String(name).slice(0, 160));
-    }
+    const created = transaction(() => {
+      const u = createUser(email, name, password, role);
+      if (role === "client") {
+        run("INSERT INTO clients (user_id, company, contact) VALUES (?,?,?)",
+          u.id, String(company || name).slice(0, 160), String(name).slice(0, 160));
+      }
+      return u;
+    });
     audit(user!.id, "user_provision", "user", created.id, "", role, rid);
     return NextResponse.json({ user: created }, { status: 201 });
   } catch (e: unknown) {
-    const err = e as Error & { status?: number };
-    return NextResponse.json({ error: err.message }, { status: err.status ?? 500 });
+    return fail(rid, e, "provision");
   }
 }

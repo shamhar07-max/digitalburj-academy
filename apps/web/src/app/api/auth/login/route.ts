@@ -4,7 +4,9 @@ import { audit, requestId, limited, fail, recordFail, checkLocked, clearFails, c
 
 export async function POST(req: Request) {
   const rid = requestId();
-  if (limited(req, "login", 20)) return NextResponse.json({ error: "Too many attempts, try again shortly" }, { status: 429 });
+  // IP flood control (generous): per-ACCOUNT brute force is stopped by the
+  // 5-strike lockout below. This limit only stops traffic floods.
+  if (limited(req, "login", 60)) return NextResponse.json({ error: "Too many attempts, try again shortly" }, { status: 429 });
   try {
     const { email, password } = await req.json();
     if (checkLocked(email)) {

@@ -2,14 +2,16 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/server/auth.js";
 import { all, run, row } from "@/server/db.js";
-import { deny, audit, requestId, requireRole, notify } from "@/server/guard.js";
+import { deny, audit, requestId, requireRole, notify, isOrgProjectCaller } from "@/server/guard.js";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function visibleTo(projectId: number, user: { id: number; role: string }) {
+async function visibleTo(projectId: number, user: { id: number; role: string }) {
   if (user.role === "admin" || user.role === "teacher") return true;
-  const p = row<{ client_id: number }>("SELECT client_id FROM projects WHERE id=?", projectId);
-  return !!p && p.client_id === user.id;
+  const p = row<{ client_id: number; org_id: number | null }>("SELECT client_id, org_id FROM projects WHERE id=?", projectId);
+  if (!p) return false;
+  if (p.client_id === user.id) return true;
+  return isOrgProjectCaller({ id: projectId, client_id: p.client_id, org_id: p.org_id }, user);
 }
 
 export async function GET(_req: Request, { params }: Ctx) {
@@ -17,7 +19,7 @@ export async function GET(_req: Request, { params }: Ctx) {
   const user = getSessionUser(jar.get("db_academy")?.value);
   if (!user) return deny("Login required", 401);
   const { id } = await params;
-  if (!visibleTo(Number(id), user)) return deny("Not your project", 403);
+  if (!(await visibleTo(Number(id), user))) return deny("Not your project", 403);
   const updates = all("SELECT u.*, us.name AS author FROM project_updates u JOIN users us ON us.id=u.author_id WHERE u.project_id=? ORDER BY u.id DESC", id);
   return NextResponse.json({ updates });
 }
@@ -46,8 +48,10 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const user = getSessionUser(jar.get("db_academy")?.value);
   if (!user) return deny("Login required", 401);
   const { id } = await params;
-  const proj = row<{ client_id: number }>("SELECT client_id FROM projects WHERE id=?", id);
-  if (!proj || (user.role === "client" && proj.client_id !== user.id)) return deny("Not your project", 403);
+  const proj = row<{ client_id: number; org_id: number | null }>("SELECT client_id, org_id FROM projects WHERE id=?", id);
+  const member = (user.role === "client" && proj && proj.client_id === user.id) ||
+    (proj && await isOrgProjectCaller({ id: Number(id), client_id: proj.client_id, org_id: proj.org_id }, user));
+  if (!proj || (user.role === "client" && !member)) return deny("Not your project", 403);
   if (user.role !== "client" && user.role !== "admin") return deny("Client approval only", 403);
   const { update_id, decision } = await req.json().catch(() => ({}));
   if (!["APPROVED", "CHANGES_REQUESTED"].includes(decision)) return NextResponse.json({ error: "Bad decision" }, { status: 422 });

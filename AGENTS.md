@@ -53,10 +53,39 @@ DEFEND → SHIP → EVIDENCE. Output is verified capability, not certificates.
 16. **Video evidence is gated content.** Magic-byte sniff (never MIME), size cap
     (`MAX_VIDEO_BYTES`), per-user quota, storage outside public dirs keyed per-database,
     playback only through the authed route (owner/staff). Tests assert 422/413/401/403.
+17. **Org-scoped projects are access-gated.** Projects carry optional `org_id`.
+    Only org members (ACTIVE membership in `memberships`) or the `client_id` owner
+    may read updates/tasks. Staff bypass. Enforced via `isOrgProjectCaller` + `visibleTo`
+    (must be `await`ed — it is async). Test: member sees, non-member blocked (403).
+18. **Change requests are atomic and single-at-a-time.** One open `PREVIEW_SUBMITTED`
+    CR per field per project (409 on duplicate). Client (or org admin) approves via
+    `PATCH /projects/:id/changes` which applies the field change inside a transaction.
+    Staff propose; only the owning client or org admin decides. Rejected CRs never
+    touch the project. Already-decided CRs return 409. Test: approve applies, dupes blocked.
+19. **Tasks are scoped to projects.** `project_tasks` requires staff creation + an
+    assignee who is a valid user. Status moves: TODO→IN_PROGRESS→DONE, BLOCKED is a
+    live state (not a dead end). Only staff or the assignee (via org membership) may
+    transition. Non-members get 403/404. Test: assignee moves own, stranger blocked.
+20. **Feature flags are caller-scoped.** `/api/flags` GET returns the full catalog
+    for admins (they manage flags); non-admins get only their effective flags
+    (platform OR matching role/org/user). Admin-only writes. Flag key must be
+    lowercase alphanumeric + dot/underscore/colon/dash. Test: teacher sees role-scoped,
+    non-admin cannot write (403).
+21. **AI requests carry token counts.** On COMPLETED, `tokens_in` and `tokens_out`
+    from the provider `usage` object are stored. `cost_cents` is reserved for
+    provider-priced rates (0 until a pricing table is layered in). DENIED rows
+    carry `tokens_in=0, tokens_out=0`. Test: audit row has numeric token fields.
+22. **SQL keywords must never be column names.** SQLite accepts reserved words
+    (`default`, `select`, etc.) as identifiers without quoting, causing cryptic
+    runtime failures. Always use non-reserved names (e.g. `default_state`, not
+    `default`). Fix is a full schema rebuild via the 12-step migration in rule 13.
 
 ## Commands
 - `ALLOW_DEMO_SEED=1 npm run db:migrate && ALLOW_DEMO_SEED=1 npm run db:seed` — local DB + demo data
 - `npm run dev` — academy web (use PORT env; default script has no -p flag)
-- `npm test` — integration suite (spawns own server + temp DB)
+- `npm test` — integration suite (spawns own server + temp DB).
+  On memory-constrained boxes run the slices sequentially instead:
+  `node --test tests/journey.test.mjs`, `node --test tests/unit.test.mjs`,
+  then `node --test --test-name-pattern="ecosystem slice|GATE 2" tests/ecosystem.test.mjs`.
 - `npm run curriculum:validate` — curriculum schema/ref/prereq audit
 - Demo logins (local/test only): `student@` / `teacher@` / `admin@digitalburj.com` / `demo1234`

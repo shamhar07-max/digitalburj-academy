@@ -14,3 +14,4 @@ export function sessionFromRequest(req: unknown, getSessionUser: (t: string | un
 export function clientIp(req: Request): string;
 export function rateLimit(key: string, limit: number, windowMs: number): boolean;
 export function limited(req: Request, scope: string, limit: number, windowMs?: number): boolean;
+export function isOrgProjectCaller(project: { id: number; client_id?: number; org_id: number | null }, user: { id: number; role: string }): Promise<boolean>;

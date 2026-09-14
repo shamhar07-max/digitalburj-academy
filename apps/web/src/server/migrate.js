@@ -146,4 +146,61 @@ if (!evSql2.includes("'video'")) {
 const bp = db.prepare(`UPDATE courses SET status='BLUEPRINT' WHERE status='PUBLISHED'
   AND code NOT IN ('DB-00','DB-01','DB-03','DB-12')`).run();
 if (Number(bp.changes) > 0) console.log(`migrated: ${bp.changes} courses → BLUEPRINT`);
+
+// GATE 2 — org-scoped projects (nullable org_id; membership enforced in API layer).
+const projCols = db.prepare("PRAGMA table_info(projects)").all().map((c) => c.name);
+if (!projCols.includes("org_id")) {
+  db.exec("ALTER TABLE projects ADD COLUMN org_id INTEGER REFERENCES organizations(id)");
+  console.log("migrated: projects.org_id");
+}
+
+// GATE 2 — project tasks (scoped, assignable work items).
+db.exec(`CREATE TABLE IF NOT EXISTS project_tasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  title TEXT NOT NULL,
+  assignee_id INTEGER REFERENCES users(id),
+  status TEXT NOT NULL DEFAULT 'TODO' CHECK (status IN ('TODO','IN_PROGRESS','BLOCKED','DONE')),
+  created_by INTEGER NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`);
+db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_project ON project_tasks(project_id)");
+
+// GATE 2 — change requests (scoped project edits awaiting client approval).
+db.exec(`CREATE TABLE IF NOT EXISTS change_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  created_by INTEGER NOT NULL REFERENCES users(id),
+  field TEXT NOT NULL CHECK (field IN ('title','status','health') OR field LIKE 'custom:%'),
+  current_value TEXT NOT NULL DEFAULT '',
+  proposed_value TEXT NOT NULL DEFAULT '',
+  reason TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'PREVIEW_SUBMITTED' CHECK (status IN ('PREVIEW','PREVIEW_SUBMITTED','APPROVED','REJECTED')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`);
+db.exec("CREATE INDEX IF NOT EXISTS idx_cr_project ON change_requests(project_id)");
+
+// GATE 2 — feature flags (platform + role-scoped toggles).
+db.exec(`CREATE TABLE IF NOT EXISTS feature_flags (
+  key TEXT PRIMARY KEY,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  scope TEXT NOT NULL DEFAULT 'platform' CHECK (scope IN ('platform','role','org','user')),
+  target TEXT NOT NULL DEFAULT '',
+  default_state INTEGER NOT NULL DEFAULT 0,
+  reason TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`);
+db.exec("CREATE INDEX IF NOT EXISTS idx_flags_scope ON feature_flags(scope, target)");
+
+// GATE 2 — AI cost/token tracking columns.
+const aiCols = db.prepare("PRAGMA table_info(ai_requests)").all().map((c) => c.name);
+if (!aiCols.includes("tokens_in")) {
+  db.exec("ALTER TABLE ai_requests ADD COLUMN tokens_in INTEGER NOT NULL DEFAULT 0");
+  db.exec("ALTER TABLE ai_requests ADD COLUMN tokens_out INTEGER NOT NULL DEFAULT 0");
+  db.exec("ALTER TABLE ai_requests ADD COLUMN cost_cents INTEGER NOT NULL DEFAULT 0");
+  console.log("migrated: ai_requests token/cost tracking");
+}
+
 console.log("migrate ok");

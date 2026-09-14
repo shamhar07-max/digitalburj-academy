@@ -401,3 +401,143 @@ export function VideoRecorder({ skills }: { skills: { code: string; name: string
     </div>
   );
 }
+
+export function TaskForm({ projectId, people }: { projectId: number; people: { id: number; name: string }[] }) {
+  const [title, setTitle] = useState("");
+  const [assignee, setAssignee] = useState("");
+  const [msg, setMsg] = useState("");
+  const router = useRouter();
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg("");
+    const res = await fetch(`/platform/api/projects/${projectId}/tasks`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, assignee_id: assignee ? Number(assignee) : null }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setMsg(res.ok ? `Task #${data.id} created.` : (data.error || "Failed"));
+    if (res.ok) { setTitle(""); setAssignee(""); router.refresh(); }
+  }
+  return (
+    <form onSubmit={submit} className="mt-2 flex flex-wrap items-center gap-2">
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task title (3+ chars)" required
+        className="min-w-0 flex-1 rounded-lg border border-hair bg-lab px-3 py-1.5 text-sm" />
+      <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className="rounded-lg border border-hair bg-lab px-3 py-1.5 text-sm">
+        <option value="">Unassigned</option>
+        {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
+      <button className="rounded-lg bg-ink px-3 py-1.5 text-xs font-bold text-paper">Add task</button>
+      {msg && <span role="status" className="text-xs text-ink-soft">{msg}</span>}
+    </form>
+  );
+}
+
+export function TaskActions({ projectId, taskId, current }: { projectId: number; taskId: number; current: string }) {
+  const router = useRouter();
+  async function set(status: string) {
+    const res = await fetch(`/platform/api/projects/${projectId}/tasks`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: taskId, status }),
+    });
+    if (res.ok) router.refresh();
+  }
+  const next = current === "TODO" ? "IN_PROGRESS" : current === "IN_PROGRESS" ? "DONE" : current === "BLOCKED" ? "IN_PROGRESS" : "";
+  return (
+    <span className="flex gap-1">
+      {next && <button onClick={() => set(next)} className="rounded-lg bg-emerald px-2 py-1 text-[11px] font-bold text-white">→ {next.replace("_", " ")}</button>}
+    </span>
+  );
+}
+
+export function ChangeForm({ projectId }: { projectId: number }) {
+  const [field, setField] = useState("title");
+  const [value, setValue] = useState("");
+  const [reason, setReason] = useState("");
+  const [msg, setMsg] = useState("");
+  const router = useRouter();
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg("");
+    const res = await fetch(`/platform/api/projects/${projectId}/changes`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ field, proposed_value: value, reason }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setMsg(res.ok ? `Change request #${data.id} — waiting on the client.` : (data.error || "Failed"));
+    if (res.ok) { setValue(""); setReason(""); router.refresh(); }
+  }
+  return (
+    <form onSubmit={submit} className="mt-2 grid gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={field} onChange={(e) => setField(e.target.value)} className="rounded-lg border border-hair bg-lab px-3 py-1.5 text-sm">
+          <option value="title">title</option><option value="status">status</option><option value="health">health</option>
+        </select>
+        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="Proposed value" required
+          className="min-w-0 flex-1 rounded-lg border border-hair bg-lab px-3 py-1.5 text-sm" />
+      </div>
+      <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why? (10+ chars — required)" required
+        className="rounded-lg border border-hair bg-lab px-3 py-1.5 text-sm" />
+      <div className="flex items-center gap-2">
+        <button className="rounded-lg bg-ink px-3 py-1.5 text-xs font-bold text-paper">Submit change request</button>
+        {msg && <span role="status" className="text-xs text-ink-soft">{msg}</span>}
+      </div>
+    </form>
+  );
+}
+
+export function ChangeActions({ projectId, requestId, current }: { projectId: number; requestId: number; current: string }) {
+  const [msg, setMsg] = useState("");
+  const router = useRouter();
+  async function decide(decision: string) {
+    setMsg("");
+    const res = await fetch(`/platform/api/projects/${projectId}/changes`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ request_id: requestId, decision }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setMsg(res.ok ? "" : (data.error || "Failed"));
+    if (res.ok) router.refresh();
+  }
+  if (current !== "PREVIEW_SUBMITTED") return (
+    <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-faint">{current.replace("_", " ")}</span>
+  );
+  return (
+    <span className="flex items-center gap-2">
+      <button onClick={() => decide("APPROVED")} className="rounded-lg bg-emerald px-3 py-1 text-xs font-bold text-white">Approve</button>
+      <button onClick={() => decide("REJECTED")} className="rounded-lg border border-hair px-3 py-1 text-xs font-bold">Reject</button>
+      {msg && <span role="status" className="text-xs text-coral">{msg}</span>}
+    </span>
+  );
+}
+
+export function FlagForm() {
+  const [f, setF] = useState({ key: "", enabled: true, scope: "platform", target: "", reason: "" });
+  const [msg, setMsg] = useState("");
+  const router = useRouter();
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg("");
+    const res = await fetch("/platform/api/flags", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f) });
+    const data = await res.json().catch(() => ({}));
+    setMsg(res.ok ? `Flag ${f.key} saved.` : (data.error || "Failed"));
+    if (res.ok) { setF({ ...f, key: "", reason: "" }); router.refresh(); }
+  }
+  return (
+    <form onSubmit={submit} className="mt-3 grid gap-2 sm:grid-cols-4">
+      <input value={f.key} onChange={(e) => setF({ ...f, key: e.target.value })} placeholder="feature.gate_1" required pattern="[a-z0-9_.:-]{2,60}"
+        className="rounded-lg border border-hair bg-lab px-3 py-2 text-sm" />
+      <select value={f.scope} onChange={(e) => setF({ ...f, scope: e.target.value })} className="rounded-lg border border-hair bg-lab px-3 py-2 text-sm">
+        <option value="platform">platform</option><option value="role">role</option><option value="org">org</option><option value="user">user</option>
+      </select>
+      <input value={f.target} onChange={(e) => setF({ ...f, target: e.target.value })} placeholder="target (role/org id/user id)" className="rounded-lg border border-hair bg-lab px-3 py-2 text-sm" />
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-1 text-xs font-semibold text-ink-soft">
+          <input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> On
+        </label>
+        <button className="rounded-lg bg-ink px-4 py-2 text-sm font-bold text-paper">Save</button>
+      </div>
+      <input value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} placeholder="why this flag exists" className="rounded-lg border border-hair bg-lab px-3 py-2 text-sm sm:col-span-4" />
+      {msg && <p role="status" className="text-xs text-ink-soft sm:col-span-4">{msg}</p>}
+    </form>
+  );
+}
