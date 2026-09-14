@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Karla, Playfair_Display, JetBrains_Mono } from "next/font/google";
+import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/server/auth.js";
@@ -7,14 +7,14 @@ import Link from "next/link";
 import { MobileNav } from "@/components/MobileNav";
 
 // Same variable names as the main site (kept so existing CSS is untouched).
-const sora = Playfair_Display({ variable: "--font-sora", subsets: ["latin"], weight: ["500", "600", "700"], style: ["normal", "italic"], display: "swap" });
-const plexsans = Karla({ variable: "--font-plexsans", subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
-const plexmono = JetBrains_Mono({ variable: "--font-plexmono", subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
+const sora = IBM_Plex_Sans({ variable: "--font-sora", subsets: ["latin"], weight: ["500", "600", "700"], display: "swap" });
+const plexsans = IBM_Plex_Sans({ variable: "--font-plexsans", subsets: ["latin"], weight: ["400", "500", "600", "700"], style: ["normal", "italic"], display: "swap" });
+const plexmono = IBM_Plex_Mono({ variable: "--font-plexmono", subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
 
 export const metadata: Metadata = {
   title: { default: "Digital Burj Academy", template: "%s — DB Academy" },
   description: "Learn by building. Missions, submissions, review, evidence.",
-  icons: { icon: "/brand/db-icon-aurora.svg" },
+  icons: { icon: "/brand/db-icon.svg" },
 };
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://digitalburj.com";
@@ -24,12 +24,12 @@ async function TopBar() {
   const user = getSessionUser(jar.get("db_academy")?.value);
   const staff = user?.role === "teacher" || user?.role === "admin";
   return (
-    <header className="sticky top-0 z-50 border-b border-hair bg-lab/90 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-hair bg-lab/95 backdrop-blur">
       <div className="container-db flex h-16 items-center justify-between gap-4">
         <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="DigitalBurj Academy home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/platform/brand/db-lockup-aurora.svg" alt="DigitalBurj — Learn, Build, Work, Grow, Go Global" width={400} height={120} className="h-10 w-auto sm:h-11" decoding="async" />
-          <span className="font-mono-d text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-faint">Academy</span>
+          <img src="/platform/brand/db-lockup.svg" alt="DigitalBurj Academy" width={400} height={120} className="h-10 w-auto sm:h-11" decoding="async" />
+          <span className="text-xs font-semibold text-ink-faint">Academy</span>
         </Link>
         <nav className="hidden items-center gap-5 text-sm font-semibold text-ink-soft md:flex">
           <Link href="/courses" className="hover:text-ink">Courses</Link>
@@ -52,7 +52,7 @@ async function TopBar() {
           <MobileNav role={user?.role} />
           {user ? (
             <>
-              <span className="font-mono-d hidden text-xs text-ink-faint sm:inline">{user.name} · {user.role}</span>
+              <span className="hidden text-xs text-ink-faint sm:inline">{user.name} · {user.role}</span>
               <form action="/platform/api/auth/session" method="post">
                 <button formAction="/platform/api/auth/session" className="rounded-lg border border-hair bg-panel px-3 py-1.5 text-xs font-bold hover:border-cobalt" formMethod="post">Log out</button>
               </form>
@@ -76,8 +76,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <TopBar />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-hair py-8">
-          <div className="container-db font-mono-d flex flex-col gap-2 text-xs text-ink-faint sm:flex-row sm:justify-between">
-            <span>© 2026 DIGITAL BURJ ACADEMY · LEARN → BUILD → VERIFY</span>
+          <div className="container-db flex flex-col gap-2 text-xs text-ink-faint sm:flex-row sm:justify-between">
+            <span>© 2026 Digital Burj Academy, Dubai, UAE</span>
             {process.env.ALLOW_DEMO_SEED === "1" && (
               <span>demo logins: student / teacher / admin @digitalburj.com · demo1234</span>
             )}
