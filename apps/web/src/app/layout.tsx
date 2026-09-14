@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Unbounded, Manrope, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/server/auth.js";
@@ -7,14 +7,14 @@ import Link from "next/link";
 import { MobileNav } from "@/components/MobileNav";
 
 // Same variable names as the main site (kept so existing CSS is untouched).
-const sora = IBM_Plex_Sans({ variable: "--font-sora", subsets: ["latin"], weight: ["500", "600", "700"], display: "swap" });
-const plexsans = IBM_Plex_Sans({ variable: "--font-plexsans", subsets: ["latin"], weight: ["400", "500", "600", "700"], style: ["normal", "italic"], display: "swap" });
-const plexmono = IBM_Plex_Mono({ variable: "--font-plexmono", subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
+const sora = Unbounded({ variable: "--font-sora", subsets: ["latin"], weight: ["500", "600", "700"], display: "swap" });
+const plexsans = Manrope({ variable: "--font-plexsans", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
+const plexmono = JetBrains_Mono({ variable: "--font-plexmono", subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
 
 export const metadata: Metadata = {
   title: { default: "Digital Burj Academy", template: "%s — DB Academy" },
   description: "Learn by building. Missions, submissions, review, evidence.",
-  icons: { icon: "/brand/db-icon.svg" },
+  icons: { icon: "/brand/db-icon-inverse.svg" },
 };
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://digitalburj.com";
@@ -24,12 +24,12 @@ async function TopBar() {
   const user = getSessionUser(jar.get("db_academy")?.value);
   const staff = user?.role === "teacher" || user?.role === "admin";
   return (
-    <header className="sticky top-0 z-50 border-b border-hair bg-lab/95 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-hair bg-lab/80 backdrop-blur-xl">
       <div className="container-db flex h-16 items-center justify-between gap-4">
         <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="DigitalBurj Academy home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/platform/brand/db-lockup.svg" alt="DigitalBurj Academy" width={400} height={120} className="h-10 w-auto sm:h-11" decoding="async" />
-          <span className="text-xs font-semibold text-ink-faint">Academy</span>
+          <img src="/platform/brand/db-lockup-inverse.svg" alt="DigitalBurj Academy" width={400} height={120} className="h-9 w-auto sm:h-10" decoding="async" />
+          <span className="font-mono-d text-[11px] font-semibold uppercase tracking-widest text-cobalt">Academy</span>
         </Link>
         <nav className="hidden items-center gap-5 text-sm font-semibold text-ink-soft md:flex">
           <Link href="/courses" className="hover:text-ink">Courses</Link>
@@ -60,7 +60,7 @@ async function TopBar() {
           ) : (
             <>
               <Link href="/login" className="font-semibold text-ink-soft hover:text-ink">Log in</Link>
-              <Link href="/register" className="rounded-lg bg-cobalt px-4 py-2 font-bold text-white hover:opacity-90">Join</Link>
+              <Link href="/register" className="rounded-lg bg-cobalt px-4 py-2 font-bold text-white transition-all hover:glow-cy hover:opacity-90">Join</Link>
             </>
           )}
         </div>
